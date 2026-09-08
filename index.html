@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simple Pairing | Heureka.cz</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+  :root {
+    --primary-blue: #0072ce;
+    --primary-blue-darker: #005ea2;
+    --text-dark: #212529;
+    --text-secondary: #6c757d;
+    --border-color: #dee2e6;
+    --background-page: #f8f9fa;
+    --background-card: #ffffff;
+    --success-color: #28a745;
+    --success-soft: #e7f7ee;
+    --danger-color: #dc3545;
+    --danger-soft: #fdeceb;
+    --warning-color: #fd7e14;
+    --warning-soft: #fff3e8;
+    --font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --border-radius: .5rem;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: var(--font-family-sans-serif); margin: 0; background: var(--background-page); color: var(--text-dark); line-height: 1.5; font-size: 14px; }
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+
+  .page-header { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+  .page-lede { color: var(--text-secondary); max-width: 760px; margin: 0 0 28px; font-size: 14.5px; }
+
+  .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
+  .sort-group { display: flex; align-items: center; gap: 10px; }
+  .sort-label { font-weight: 600; color: var(--text-dark); font-size: 14px; }
+  .segmented { display: inline-flex; flex-wrap: wrap; background: #eef0f2; border-radius: 10px; padding: 4px; gap: 2px; }
+  .segmented button {
+    border: none; background: transparent; padding: 7px 16px; border-radius: 8px; font-size: 13.5px;
+    color: var(--text-secondary); font-family: inherit; cursor: pointer; font-weight: 500;
+  }
+  .segmented button.active { background: #fff; color: var(--text-dark); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+
+  .progress-line { color: var(--text-secondary); font-size: 13.5px; display: flex; gap: 18px; flex-wrap: wrap; }
+  .progress-line b { color: var(--text-dark); }
+  .progress-line .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+  .toast { background: var(--success-soft); border: 1px solid #b7e4cf; color: #12805c; padding: 10px 16px; border-radius: var(--border-radius); font-size: 13.5px; font-weight: 500; margin-bottom: 18px; display: none; }
+  .toast.show { display: block; }
+
+  .match-row { display: flex; align-items: stretch; gap: 18px; margin-top: 22px; }
+  @media (max-width: 900px) { .match-row { flex-direction: column; } }
+
+  .offer-card {
+    flex: 1 1 360px; max-width: 400px; background: var(--background-card); border: 1px solid var(--border-color);
+    border-radius: 14px; padding: 20px; display: flex; flex-direction: column;
+  }
+  .offer-thumb {
+    width: 84px; height: 84px; border-radius: 10px; background: linear-gradient(135deg,#eef1f5,#e2e6eb);
+    display: flex; align-items: center; justify-content: center; font-size: 30px; color: #9aa4b2; margin-bottom: 14px;
+  }
+  .offer-name { font-weight: 700; font-size: 16px; color: var(--text-dark); text-decoration: underline; text-decoration-color: #c7ccd1; margin: 0 0 10px; line-height: 1.35; }
+  .offer-meta { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px; }
+  .offer-price { font-weight: 700; font-size: 18px; margin-top: auto; padding-top: 10px; }
+
+  .arrow-col { flex: 0 0 46px; display: flex; align-items: center; justify-content: center; color: #c7ccd1; font-size: 20px; }
+  @media (max-width: 900px) { .arrow-col { transform: rotate(90deg); margin: -6px auto; } }
+
+  .status-box {
+    flex: 1 1 420px; border: 2px dashed #d7dbe0; border-radius: 14px; background: #fafbfc;
+    padding: 26px 26px; display: flex; flex-direction: column; align-items: center; text-align: center; justify-content: center; gap: 6px;
+  }
+  .status-box.is-matched { border-style: solid; border-color: #b7e4cf; background: var(--success-soft); text-align: left; align-items: flex-start; justify-content: flex-start; }
+  .status-box .empty-icon { margin-bottom: 8px; }
+  .status-box .empty-text { color: var(--text-secondary); font-size: 14px; max-width: 320px; }
+
+  .matched-head { display: flex; align-items: center; gap: 10px; font-weight: 700; color: #12805c; font-size: 14.5px; margin-bottom: 10px; }
+  .matched-name { font-weight: 700; font-size: 15.5px; color: var(--text-dark); margin-bottom: 4px; }
+  .matched-cat { font-size: 12.5px; color: var(--text-secondary); }
+
+  .name-editor { width: 100%; margin-top: 16px; text-align: left; border-top: 1px dashed #d7dbe0; padding-top: 16px; }
+  .name-editor label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 8px; }
+  .name-editor input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px;
+    font-family: inherit; margin-bottom: 10px;
+  }
+  .name-editor input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 .2rem rgba(0,114,206,.2); }
+  .rule-hint { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+  .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 6px; border: 1px solid transparent; }
+  .chip.ok { background: var(--success-soft); color: #12805c; border-color: #b7e4cf; }
+  .chip.missing { background: var(--danger-soft); color: var(--danger-color); border-color: #f5c6c1; }
+  .chip.manual { background: #eaf2fb; color: var(--primary-blue); border-color: #cfe2f6; }
+  .all-good { font-size: 13px; color: #12805c; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
+
+  .actions-col { flex: 0 0 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
+  @media (max-width: 900px) { .actions-col { flex-direction: row; } }
+  .btn-primary {
+    background: var(--primary-blue); color: #fff; border: none; padding: 11px 22px; border-radius: 8px;
+    font-size: 14.5px; font-weight: 600; cursor: pointer; width: 100%; transition: background .15s ease;
+  }
+  .btn-primary:hover { background: var(--primary-blue-darker); }
+  .btn-primary:disabled { background: #b9d4ea; cursor: not-allowed; }
+  .btn-link { background: none; border: none; color: var(--text-secondary); font-size: 13.5px; text-decoration: underline; cursor: pointer; font-family: inherit; }
+  .btn-link:hover { color: var(--text-dark); }
+  .btn-secondary-link { background: none; border: none; color: var(--primary-blue); font-size: 13px; text-decoration: underline; cursor: pointer; font-family: inherit; padding: 0; margin-top: 4px; }
+
+  .done-panel { text-align: center; padding: 70px 20px; background: var(--background-card); border: 1px solid var(--border-color); border-radius: 14px; margin-top: 22px; }
+  .done-panel i { font-size: 40px; color: var(--success-color); margin-bottom: 14px; }
+  .done-panel h2 { margin: 0 0 8px; font-size: 20px; }
+  .done-panel p { color: var(--text-secondary); margin: 0 0 20px; }
+
+  .sock-icon { width: 56px; height: 56px; }
+
+  @media (max-width: 480px) {
+    .sort-group { width: 100%; flex-direction: column; align-items: flex-start; }
+    .segmented { width: 100%; }
+    .segmented button { flex: 1 1 auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1 class="page-header">Simple Pairing</h1>
+  <p class="page-lede">Všechny nabídky z vašeho feedu procházíme automaticky přes shodu EAN kódu. Tady je projdete jednu po druhé — u shody stačí párování potvrdit, u nabídky bez shody rovnou opravíte název podle toho, co jí podle vzoru kategorie na Heurece chybí, a pošlete ji ke kontrole.</p>
+
+  <div class="toolbar">
+    <div class="sort-group">
+      <span class="sort-label">Seřadit:</span>
+      <div class="segmented" id="sortSeg">
+        <button data-sort="abc" class="active">Abecedně</button>
+        <button data-sort="priceDesc">Od nejdražších</button>
+        <button data-sort="priceAsc">Od nejlevnějších</button>
+      </div>
+    </div>
+    <div class="progress-line" id="progressLine"></div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+(async function () {
+  /* ============ VALIDÁTOR NÁZVU (stejná logika jako Feed validátor / Přehled spárovanosti) ============ */
+  let RULES = {}, PARAMS = {};
+  try {
+    const proto = await (await fetch('./proto-data.json')).json();
+    RULES = proto.rules || {}; PARAMS = proto.params || {};
+  } catch (e) { console.error('proto-data.json se nepodařilo načíst', e); }
+
+  const fold = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  function dejZakladSlova(slovo) {
+    slovo = fold(slovo);
+    if (slovo.length <= 3) return slovo;
+    const konc = ['ova','ove','ovy','ovou','oveho','ovemu','ovych','ovym','ovymi','ami','em','ech','ich','um','ou','am','y','e','a','i','o','u'];
+    for (const k of konc) { if (slovo.endsWith(k)) { const r = slovo.slice(0, -k.length); if (r.length >= 3) return r; break; } }
+    return slovo;
+  }
+  function najdiPresne(leaf, db) {
+    const k = (leaf || '').toLowerCase().trim();
+    if (Object.prototype.hasOwnProperty.call(db, k)) return db[k];
+    const z = dejZakladSlova(k);
+    for (const kd in db) { if (dejZakladSlova(kd) === z) return db[kd]; }
+    return null;
+  }
+  const parseParams = t => (t ? t.split(',').map(s => s.trim()).filter(Boolean) : []);
+  const splitRule = r => { if (!r) return { format: '', example: '' }; const m = r.match(/\s[–—]\s/); if (!m) return { format: r.trim(), example: '' }; const i = r.indexOf(m[0]); return { format: r.slice(0, i).trim(), example: r.slice(i + m[0].length).trim() }; };
+  const leafOf = ct => (ct || '').split('|').pop().trim().toLowerCase();
+
+  const BARVY = ['cern','bil','cerven','modr','zelen','zlut','oranzov','fialov','ruzov','hned','bezov','zlat','stribr','tyrkys','khaki','antracit','bordo','purpur','azur','kremov','smetanov','vinov','grafit','olivov','lososov','koralov','indigov','marengo','petrolej'];
+  const MATERIALY = ['bavln','polyester','kuze','usen','drev','sklo','plast','nerez','kov','guma','silikon','vlna','vlnen','len','lnen','hedvab','keramik','porcelan'];
+  const PRICHUTE = ['kure','hovez','kral','jehnec','kachn','krut','losos','tunak','drubez','telec','zverin','sardin','tresk','kreve','jelen','vepr','pstruh','ryba','rybi','jahod','cokolad','vanilk','banan','orisk','orech','karamel','kokos','malin','boruvk','visn','citron','pomeranc','jablk','hrusk','mango','meloun','brosk','kava','skoric','pistac','ananas','limetk','oreo','tiramis','slany'];
+  const URCENI = ['adult','junior','senior','kitten','puppy','stenat','stene','dospel','detsk','kastrov','steriliz','large breed','small breed'];
+  const KONZISTENCE = ['v zele','ve stav','v omacc','pastik','mousse','pena','krem','prasek','tablet','kapsl','sirup','tekut','granul','susen','koncentrat','pate'];
+  const slovnikHit = (dic, name) => { const f = fold(name); return dic.some(r => r.includes(' ') ? f.includes(r) : new RegExp('\\b' + r).test(f)); };
+  const POCET_UNITS = ['ks','kus\\w*','pack','balen\\w*','tablet\\w*','kapsl\\w*','tobol\\w*','sac\\w*','porc\\w*','dn[ií]','dni','ampul\\w*'];
+  const numUnit = (f, units) => new RegExp('\\b\\d+([.,]\\d+)?\\s?(' + units.join('|') + ')\\b').test(f);
+  const DRUH_MLETI = ['zrnkov','mlet','mlynek','celozrn','instant'];
+  const BARVY_EN = ['black','white','blue','red','green','yellow','orange','purple','pink','brown','grey','gray','gold','silver','navy','beige','turquoise','violet','graphite','midnight','starlight'];
+  const BARVY_EN_MULTI = ['space gray','space grey','rose gold','jet black','sky blue'];
+  const jeBarva = f => BARVY.some(r => new RegExp('\\b' + r).test(f)) || /\bsed[aeiy]/.test(f) || /\bsiv/.test(f) || /barevn/.test(f) || /\bpruhledn/.test(f) || /\btransparent/.test(f) || /\bcir[aey]/.test(f)
+    || BARVY_EN.some(r => new RegExp('\\b' + r + '\\b').test(f)) || BARVY_EN_MULTI.some(r => f.includes(r));
+  function jeKod(name) {
+    return name.split(/\s+/).some(t => {
+      const c = t.replace(/[.,;:()]/g, '');
+      if (/^\d{5,}$/.test(c)) return true;
+      const p = (c.match(/[a-zA-Z]/g) || []).length, d = (c.match(/\d/g) || []).length;
+      return p >= 2 && d >= 1 && c.length >= 4;
+    });
+  }
+  function detekujSlozku(slot, name, manufacturer) {
+    const f = fold(name);
+    switch (slot) {
+      case 'objem':    return numUnit(f, ['ml','cl','dl','l','litr\\w*']);
+      case 'hmotnost': return numUnit(f, ['mg','dkg','kg','g','gr','gram\\w*']);
+      case 'rozmer':   return /\d+([.,]\d+)?\s?[x×]\s?\d/.test(f) || numUnit(f, ['mm','cm','m']);
+      case 'barva':    return jeBarva(f);
+      case 'material': return MATERIALY.some(m => new RegExp('\\b' + m).test(f));
+      case 'velikost': return /\b(XXS|XS|S|M|L|XL|XXL|XXXL)\b/.test(name) || /\bvel\.?\s*\w/.test(f);
+      case 'pamet':    return /\b\d+([.,]\d+)?\s?(gb|tb|mb)\b/.test(f);
+      case 'pocet':    return new RegExp('\\b\\d+\\s?(' + POCET_UNITS.join('|') + ')\\b').test(f) || /\b\d+\s?[x×]\s?\d/.test(f);
+      case 'kod':      return jeKod(name);
+      case 'nazev':    return name.trim().length > 0;
+      case 'druhmleti':   return slovnikHit(DRUH_MLETI, name);
+      case 'prichut':     return slovnikHit(PRICHUTE, name);
+      case 'urceni':      return slovnikHit(URCENI, name);
+      case 'konzistence': return slovnikHit(KONZISTENCE, name);
+      case 'znacka':   return manufacturer ? f.includes(fold(manufacturer)) : null;
+      default:         return null;
+    }
+  }
+  function klasifikujSlozku(label) {
+    const f = fold(label);
+    if (f.includes('objem')) return 'objem';
+    if (f.includes('hmotnost') || f.includes('vaha') || f.includes('gramaz')) return 'hmotnost';
+    if (f.includes('rozmer') || f.includes('delka') || f.includes('prumer')) return 'rozmer';
+    if (f.includes('pamet') || f.includes('uloz')) return 'pamet';
+    if (f.includes('velikost')) return 'velikost';
+    if (f.includes('barva') || f.includes('barevn') || f.includes('odstin')) return 'barva';
+    if (f.includes('material')) return 'material';
+    if (f.includes('cislo') || f.includes('kod') || f.includes('oznaceni')) return 'kod';
+    if (f.includes('pocet') || f.includes('mnozstvi')) return 'pocet';
+    if (f.includes('mleti')) return 'druhmleti';
+    if (f.includes('prichut')) return 'prichut';
+    if (f.includes('urceni')) return 'urceni';
+    if (f.includes('konzistenc')) return 'konzistence';
+    if (f.includes('nazev')) return 'nazev';
+    if (f.includes('znacka') || f.includes('vyrobce')) return 'znacka';
+    return null;
+  }
+  function vzorTokeny(format) {
+    return format.split('|').map(t => {
+      t = t.trim();
+      const m = t.match(/^(.*?)\s*\((.*)\)\s*$/);
+      return { label: (m ? m[1] : t).trim(), optional: !!m && /pokud/i.test(m[2]) };
+    }).filter(t => t.label);
+  }
+  function analyzujNazev(ruleFormat, name, manufacturer) {
+    return vzorTokeny(ruleFormat).map(t => {
+      const slot = klasifikujSlozku(t.label);
+      const res = slot ? detekujSlozku(slot, name, manufacturer) : null;
+      let stav = 'rucne';
+      if (res === true) stav = 'je';
+      else if (res === false) stav = t.optional ? 'nepovinne' : 'chybi';
+      return { label: t.label, stav };
+    });
+  }
+  function diagnostikaNazvu(offer, name) {
+    const leaf = leafOf(offer.categoryText);
+    const rule = najdiPresne(leaf, RULES);
+    if (!rule) return null;
+    const format = splitRule(rule).format;
+    const komponenty = analyzujNazev(format, name, offer.manufacturer);
+    return { format, komponenty, chybejici: komponenty.filter(k => k.stav === 'chybi').map(k => k.label) };
+  }
+
+  /* ============ 20 UKÁZKOVÝCH NABÍDEK ============ */
+  const D = 'https://www.eshop-ukazka.cz';
+  const CAT = {
+    batohy: 'Heureka.cz | Oblečení, obuv a doplňky | Módní doplňky | Batohy, tašky a kabelky | Batohy',
+    sortky: 'Heureka.cz | Oblečení, obuv a doplňky | Pánské oblečení | Pánské kraťasy a šortky',
+    mikiny: 'Heureka.cz | Oblečení, obuv a doplňky | Dětské oblečení | Dětské mikiny a svetry | Dětské mikiny',
+    reproduktory: 'Heureka.cz | Elektronika | TV, audio, video | Reproduktory, soundbary | Bluetooth reproduktory',
+    fotoaparaty: 'Heureka.cz | Elektronika | Foto, kamery, optika | Foto a kamery | Digitální fotoaparáty',
+    cdprehravace: 'Heureka.cz | Elektronika | TV, audio, video | Hi-Fi komponenty | CD přehrávače',
+    kopacky: 'Heureka.cz | Sport a outdoor | Sporty | Míčové sporty | Fotbal | Fotbalová obuv | Pánské kopačky',
+    damsortky: 'Heureka.cz | Oblečení, obuv a doplňky | Dámské oblečení | Dámské šortky',
+    knihy: 'Heureka.cz | Filmy, knihy, hry | Četba | Knihy',
+    kava: 'Heureka.cz | Jídlo a nápoje | Káva a kávové kapsle | Káva | Zrnková káva',
+    powerbanky: 'Heureka.cz | Elektronika | Baterie a nabíjení | Powerbanky',
+  };
+  const ean = seed => String(seed).padStart(13, '0');
+  let uid = 0;
+  const off = (name, categoryText, manufacturer, price, matched, opts = {}) => {
+    uid++;
+    return { id: 'OFR' + String(uid).padStart(3, '0'), name, categoryText, manufacturer, price, ean: ean(880000000000 + uid * 37), matched,
+      matchedName: opts.matchedName || name, icon: opts.icon || 'fa-box', status: 'pending' };
+  };
+
+  const offers = [
+    off('Mami\'s Caffé Espresso Crema zrnková káva', CAT.kava, "Mami's Caffé", 349, false, { icon: 'fa-mug-hot' }),
+    off('Dakine Pivot batoh zelený 25l', CAT.batohy, 'Dakine', 1290, true, { icon: 'fa-backpack', matchedName: 'Dakine Pivot batoh zelený 25l' }),
+    off('Nebbia šortky 343 černá', CAT.sortky, 'Nebbia', 690, false, { icon: 'fa-person' }),
+    off('Niceboy RAZE 3', CAT.reproduktory, 'Niceboy', 890, false, { icon: 'fa-volume-high' }),
+    off('Nikon D3100 Red', CAT.fotoaparaty, 'Nikon', 8990, false, { icon: 'fa-camera' }),
+    off('Denon DCD-520 černý', CAT.cdprehravace, 'Denon', 4290, true, { icon: 'fa-compact-disc', matchedName: 'Denon DCD-520 černý' }),
+    off('Predator X TRX FG', CAT.kopacky, '', 1990, false, { icon: 'fa-futbol' }),
+    off('Nebbia 266 fitness šortky modré M', CAT.damsortky, 'Nebbia', 590, true, { icon: 'fa-person-dress', matchedName: 'Nebbia 266 fitness šortky modré M' }),
+    off('Tajemství Julie Garwoodová', CAT.knihy, '', 249, true, { icon: 'fa-book', matchedName: 'Tajemství - Julie Garwoodová (brož.)' }),
+    off('i-Tec PB3400', CAT.powerbanky, 'i-Tec', 590, true, { icon: 'fa-battery-full', matchedName: 'i-Tec PB3400' }),
+    off('Alpine Pro Elkini 3 dětská mikina', CAT.mikiny, 'Alpine Pro', 790, false, { icon: 'fa-shirt' }),
+    off('Dakine Pivot batoh 30l', CAT.batohy, 'Dakine', 1390, false, { icon: 'fa-backpack' }),
+    off('GoPro HERO7 Black Edition', CAT.fotoaparaty, 'GoPro', 6490, true, { icon: 'fa-camera', matchedName: 'GoPro HERO7 Black Edition' }),
+    off('JBL Charge 6', CAT.reproduktory, 'JBL', 3290, false, { icon: 'fa-volume-high' }),
+    off('Mokka Brazil zrnková káva 1kg', CAT.kava, 'Mokka', 429, false, { icon: 'fa-mug-hot' }),
+    off('Nike Air šortky', CAT.sortky, 'Nike', 590, false, { icon: 'fa-person' }),
+    off('Anker PowerCore', CAT.powerbanky, 'Anker', 790, false, { icon: 'fa-battery-full' }),
+    off('Predator X TRX FG Black EUR 42', CAT.kopacky, 'Adidas', 2190, true, { icon: 'fa-futbol', matchedName: 'Predator X TRX FG Black/White/Cyan EUR 42' }),
+    off('Roadstar PCD-435CD/RD červená', CAT.cdprehravace, 'Roadstar', 2490, false, { icon: 'fa-compact-disc' }),
+    off('Terry Pratchett Barva kouzel', CAT.knihy, '', 279, true, { icon: 'fa-book', matchedName: 'Barva kouzel - Terry Pratchett (brož.)' }),
+  ];
+
+  /* ============ STAV ============ */
+  let sortMode = 'abc';
+  const postponed = new Set();
+  const editedNames = {};
+
+  function currentQueue() {
+    const pending = offers.filter(o => o.status === 'pending');
+    const cmp = sortMode === 'priceDesc' ? (a, b) => b.price - a.price
+              : sortMode === 'priceAsc' ? (a, b) => a.price - b.price
+              : (a, b) => a.name.localeCompare(b.name, 'cs');
+    const notPostponed = pending.filter(o => !postponed.has(o.id)).sort(cmp);
+    const isPostponed = pending.filter(o => postponed.has(o.id)).sort(cmp);
+    return [...notPostponed, ...isPostponed];
+  }
+
+  function counts() {
+    return {
+      total: offers.length,
+      parovano: offers.filter(o => o.status === 'parovano').length,
+      kontrola: offers.filter(o => o.status === 'kontrola').length,
+      zbyva: offers.filter(o => o.status === 'pending').length,
+    };
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+  }
+  function hideToast() { document.getElementById('toast').classList.remove('show'); }
+
+  function renderProgress() {
+    const c = counts();
+    document.getElementById('progressLine').innerHTML = `
+      <span><span class="dot" style="background:var(--success-color)"></span>Spárováno: <b>${c.parovano}</b></span>
+      <span><span class="dot" style="background:var(--warning-color)"></span>Čeká na kontrolu: <b>${c.kontrola}</b></span>
+      <span><span class="dot" style="background:#adb5bd"></span>Zbývá: <b>${c.zbyva}</b></span>
+      <span>Celkem: <b>${c.total}</b></span>`;
+  }
+
+  const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  function chipHTML(k) {
+    if (k.stav === 'je') return `<span class="chip ok">✓ ${escapeHTML(k.label)}</span>`;
+    if (k.stav === 'chybi') return `<span class="chip missing">✗ ${escapeHTML(k.label)}</span>`;
+    if (k.stav === 'nepovinne') return `<span class="chip ok">○ ${escapeHTML(k.label)}</span>`;
+    return `<span class="chip manual">? ${escapeHTML(k.label)}</span>`;
+  }
+
+  function diagBlockHTML(offer, name) {
+    const diag = diagnostikaNazvu(offer, name);
+    if (!diag) return `<div class="rule-hint">Pro tuto kategorii nemáme uložený vzor názvu — ověřte ručně.</div>`;
+    const chybi = diag.chybejici;
+    return `<div class="rule-hint">Vzor pro „${escapeHTML(leafOf(offer.categoryText))}“: ${escapeHTML(diag.format)}</div>
+      <div class="chip-row">${diag.komponenty.map(chipHTML).join('')}</div>
+      ${!chybi.length ? `<div class="all-good"><i class="fas fa-circle-check"></i> Podle vzoru kategorie už nic nechybí</div>` : ''}`;
+  }
+
+  function render() {
+    renderProgress();
+    const queue = currentQueue();
+    const content = document.getElementById('content');
+    if (!queue.length) {
+      const c = counts();
+      content.innerHTML = `
+        <div class="done-panel">
+          <i class="fas fa-circle-check"></i>
+          <h2>Všechny nabídky zpracované</h2>
+          <p>Spárováno: ${c.parovano} · Odesláno ke kontrole: ${c.kontrola} z celkem ${c.total} nabídek.</p>
+          <button class="btn-primary" style="width:auto;" id="resetBtn">Začít znovu</button>
+        </div>`;
+      document.getElementById('resetBtn').addEventListener('click', () => {
+        offers.forEach(o => { o.status = 'pending'; }); postponed.clear();
+        Object.keys(editedNames).forEach(k => delete editedNames[k]);
+        hideToast(); render();
+      });
+      return;
+    }
+
+    const o = queue[0];
+    const catPath = o.categoryText.split('|').map(s => s.trim());
+    const catShort = catPath.slice(-3).join(' | ');
+    const currentName = editedNames[o.id] ?? o.name;
+
+    let rightHTML = '';
+    let actionsHTML = '';
+
+    if (o.matched) {
+      rightHTML = `
+        <div class="status-box is-matched">
+          <div class="matched-head"><i class="fas fa-circle-check"></i> Nalezena shoda podle EAN</div>
+          <div class="matched-name">${escapeHTML(o.matchedName)}</div>
+          <div class="matched-cat">${escapeHTML(catShort)}</div>
+        </div>`;
+      actionsHTML = `
+        <button class="btn-primary" id="confirmBtn">Potvrdit spárování</button>
+        <button class="btn-link" id="notMatchBtn">Není to shoda</button>`;
+    } else {
+      rightHTML = `
+        <div class="status-box">
+          <svg class="sock-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6h10v20c0 4 2 7 5 10l6 7c2 3 1 8-3 9H24c-4 0-7-3-7-7V13c0-4 1-7 3-7z" stroke="#17a2c4" stroke-width="2.5" fill="#eaf7fb"/>
+            <path d="M31 26h9" stroke="#17a2c4" stroke-width="2"/>
+            <path d="M34 10h10v20c0 4 2 7 5 10l3 4c2 3 1 8-3 9H38c-4 0-7-3-7-7V17c0-4 1-7 3-7z" stroke="#0b3d91" stroke-width="2.5" fill="#eaeefc"/>
+            <circle cx="47" cy="12" r="7" fill="#0072ce"/>
+            <text x="47" y="16" font-size="10" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui">?</text>
+          </svg>
+          <div class="empty-text">Nepodařilo se nám najít odpovídající produkt pro párování na Heurece.</div>
+          <div class="name-editor">
+            <label>Upravte název nabídky podle toho, co pro tuto kategorii chybí:</label>
+            <input type="text" id="nameInput" value="${escapeHTML(currentName)}">
+            <div id="diagBlock">${diagBlockHTML(o, currentName)}</div>
+          </div>
+        </div>`;
+      actionsHTML = `
+        <button class="btn-primary" id="submitBtn">Odeslat ke kontrole</button>
+        <button class="btn-link" id="postponeBtn">Odložit</button>`;
+    }
+
+    content.innerHTML = `
+      <div class="match-row">
+        <div class="offer-card">
+          <div class="offer-thumb"><i class="fas ${o.icon}"></i></div>
+          <div class="offer-name">${escapeHTML(o.name)}</div>
+          <div class="offer-meta">Kategorie: ${escapeHTML(catShort)}</div>
+          <div class="offer-meta">EAN: ${o.ean}</div>
+          <div class="offer-price">${o.price.toLocaleString('cs-CZ')} Kč</div>
+        </div>
+        <div class="arrow-col"><i class="fas fa-arrow-right"></i></div>
+        ${rightHTML}
+        <div class="actions-col">${actionsHTML}</div>
+      </div>`;
+
+    if (o.matched) {
+      document.getElementById('confirmBtn').addEventListener('click', () => {
+        o.status = 'parovano'; postponed.delete(o.id);
+        showToast(`✓ „${o.name}“ bylo spárováno.`);
+        render();
+      });
+      document.getElementById('notMatchBtn').addEventListener('click', () => {
+        o.matched = false; hideToast(); render();
+      });
+    } else {
+      const input = document.getElementById('nameInput');
+      input.addEventListener('input', () => {
+        editedNames[o.id] = input.value;
+        document.getElementById('diagBlock').innerHTML = diagBlockHTML(o, input.value);
+      });
+      document.getElementById('submitBtn').addEventListener('click', () => {
+        o.name = editedNames[o.id] ?? o.name;
+        o.status = 'kontrola'; postponed.delete(o.id);
+        showToast(`✓ „${o.name}“ odesláno ke kontrole.`);
+        render();
+      });
+      document.getElementById('postponeBtn').addEventListener('click', () => {
+        postponed.add(o.id); hideToast(); render();
+      });
+    }
+  }
+
+  document.getElementById('sortSeg').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-sort]');
+    if (!btn) return;
+    sortMode = btn.dataset.sort;
+    document.querySelectorAll('#sortSeg button').forEach(b => b.classList.toggle('active', b === btn));
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
