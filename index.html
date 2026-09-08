@@ -40,9 +40,42 @@
   }
   .segmented button.active { background: #fff; color: var(--text-dark); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 
-  .progress-line { color: var(--text-secondary); font-size: 13.5px; display: flex; gap: 18px; flex-wrap: wrap; }
-  .progress-line b { color: var(--text-dark); }
-  .progress-line .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+  .progress-line { display: flex; gap: 10px; flex-wrap: wrap; }
+  .stat-btn {
+    display: inline-flex; align-items: center; gap: 8px; background: var(--background-card); border: 1px solid var(--border-color);
+    border-radius: 10px; padding: 8px 14px; font-size: 13.5px; color: var(--text-secondary); cursor: pointer; font-family: inherit;
+    transition: all .15s ease;
+  }
+  .stat-btn:hover { border-color: #b9c1c9; }
+  .stat-btn b { color: var(--text-dark); font-size: 14.5px; }
+  .stat-btn .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .stat-btn.active { border-color: var(--primary-blue); background: #eaf2fb; box-shadow: 0 0 0 1px var(--primary-blue) inset; }
+  .stat-btn.total { cursor: default; }
+  .stat-btn.total:hover { border-color: var(--border-color); }
+
+  .list-header { display: flex; align-items: center; justify-content: space-between; margin: 22px 0 14px; }
+  .list-header h2 { font-size: 18px; margin: 0; }
+  .back-link { background: none; border: none; color: var(--primary-blue); font-size: 13.5px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 0; }
+  .back-link:hover { text-decoration: underline; }
+
+  .list-row {
+    display: flex; align-items: center; gap: 16px; background: var(--background-card); border: 1px solid var(--border-color);
+    border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
+  }
+  .list-row .row-thumb {
+    width: 44px; height: 44px; border-radius: 8px; background: linear-gradient(135deg,#eef1f5,#e2e6eb);
+    display: flex; align-items: center; justify-content: center; font-size: 17px; color: #9aa4b2; flex-shrink: 0;
+  }
+  .list-row .row-main { flex: 1 1 auto; min-width: 0; }
+  .list-row .row-name { font-weight: 700; font-size: 14.5px; color: var(--text-dark); margin-bottom: 3px; }
+  .list-row .row-meta { font-size: 12px; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .list-row .row-price { font-weight: 700; font-size: 14.5px; flex: 0 0 90px; text-align: right; }
+  .list-row .row-badge { flex: 0 0 auto; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 6px; white-space: nowrap; }
+  .row-badge.matched { background: var(--success-soft); color: #12805c; }
+  .row-badge.unmatched { background: var(--danger-soft); color: var(--danger-color); }
+  .row-badge.kontrola { background: var(--warning-soft); color: #9a5b00; }
+  .list-row .row-action { flex: 0 0 auto; }
+  .empty-list { text-align: center; padding: 50px 20px; color: var(--text-secondary); background: var(--background-card); border: 1px dashed var(--border-color); border-radius: 12px; }
 
   .toast { background: var(--success-soft); border: 1px solid #b7e4cf; color: #12805c; padding: 10px 16px; border-radius: var(--border-radius); font-size: 13.5px; font-weight: 500; margin-bottom: 18px; display: none; }
   .toast.show { display: block; }
@@ -115,6 +148,15 @@
     .sort-group { width: 100%; flex-direction: column; align-items: flex-start; }
     .segmented { width: 100%; }
     .segmented button { flex: 1 1 auto; }
+  }
+
+  @media (max-width: 620px) {
+    .list-row { flex-wrap: wrap; }
+    .list-row .row-main { flex: 1 1 100%; order: 1; }
+    .list-row .row-thumb { order: 0; }
+    .list-row .row-price { order: 2; flex: 0 0 auto; text-align: left; margin-left: 60px; }
+    .list-row .row-badge { order: 3; }
+    .list-row .row-action { order: 4; margin-left: auto; }
   }
 </style>
 </head>
@@ -303,17 +345,33 @@
 
   /* ============ STAV ============ */
   let sortMode = 'abc';
+  let viewMode = 'queue'; // 'queue' | 'parovano' | 'nesparovano' | 'kontrola'
+  let pinnedId = null;
   const postponed = new Set();
   const editedNames = {};
 
+  const sortCmp = () => sortMode === 'priceDesc' ? (a, b) => b.price - a.price
+    : sortMode === 'priceAsc' ? (a, b) => a.price - b.price
+    : (a, b) => a.name.localeCompare(b.name, 'cs');
+
   function currentQueue() {
     const pending = offers.filter(o => o.status === 'pending');
-    const cmp = sortMode === 'priceDesc' ? (a, b) => b.price - a.price
-              : sortMode === 'priceAsc' ? (a, b) => a.price - b.price
-              : (a, b) => a.name.localeCompare(b.name, 'cs');
+    const cmp = sortCmp();
     const notPostponed = pending.filter(o => !postponed.has(o.id)).sort(cmp);
     const isPostponed = pending.filter(o => postponed.has(o.id)).sort(cmp);
-    return [...notPostponed, ...isPostponed];
+    let list = [...notPostponed, ...isPostponed];
+    if (pinnedId) {
+      const idx = list.findIndex(o => o.id === pinnedId);
+      if (idx > 0) { const [p] = list.splice(idx, 1); list.unshift(p); }
+    }
+    return list;
+  }
+
+  function bucketOffers(bucket) {
+    const filtered = offers.filter(o => bucket === 'parovano' ? o.status === 'parovano'
+      : bucket === 'kontrola' ? o.status === 'kontrola'
+      : o.status === 'pending');
+    return filtered.sort(sortCmp());
   }
 
   function counts() {
@@ -333,11 +391,78 @@
 
   function renderProgress() {
     const c = counts();
-    document.getElementById('progressLine').innerHTML = `
-      <span><span class="dot" style="background:var(--success-color)"></span>Spárováno: <b>${c.parovano}</b></span>
-      <span><span class="dot" style="background:var(--warning-color)"></span>Čeká na kontrolu: <b>${c.kontrola}</b></span>
-      <span><span class="dot" style="background:#adb5bd"></span>Zbývá: <b>${c.zbyva}</b></span>
-      <span>Celkem: <b>${c.total}</b></span>`;
+    const line = document.getElementById('progressLine');
+    const btn = (bucket, color, label, value) => `
+      <button type="button" class="stat-btn${viewMode === bucket ? ' active' : ''}" data-bucket="${bucket}">
+        <span class="dot" style="background:${color}"></span>${label}: <b>${value}</b>
+      </button>`;
+    line.innerHTML = [
+      btn('parovano', 'var(--success-color)', 'Spárováno', c.parovano),
+      btn('nesparovano', '#adb5bd', 'Nespárováno', c.zbyva),
+      btn('kontrola', 'var(--warning-color)', 'Čekající', c.kontrola),
+      `<span class="stat-btn total">Celkem: <b>${c.total}</b></span>`,
+    ].join('');
+    line.querySelectorAll('button[data-bucket]').forEach(b => b.addEventListener('click', () => {
+      const bucket = b.dataset.bucket;
+      viewMode = viewMode === bucket ? 'queue' : bucket;
+      hideToast();
+      render();
+    }));
+  }
+
+  function catShortOf(o) { return o.categoryText.split('|').map(s => s.trim()).slice(-3).join(' | '); }
+
+  function renderListView(bucket) {
+    const content = document.getElementById('content');
+    const list = bucketOffers(bucket);
+    const titles = { parovano: 'Spárované nabídky', nesparovano: 'Nespárované nabídky', kontrola: 'Čekající na kontrolu' };
+    let rowsHTML = '';
+    if (!list.length) {
+      rowsHTML = `<div class="empty-list">V této skupině zatím nejsou žádné nabídky.</div>`;
+    } else {
+      rowsHTML = list.map(o => {
+        let badge = '', action = '';
+        if (bucket === 'nesparovano') {
+          badge = o.matched ? `<span class="row-badge matched">Shoda nalezena</span>` : `<span class="row-badge unmatched">Shoda nenalezena</span>`;
+          action = `<button class="btn-primary row-action" style="width:auto;" data-open="${o.id}">Otevřít</button>`;
+        } else if (bucket === 'parovano') {
+          badge = `<span class="row-badge matched">Spárováno</span>`;
+          action = `<button class="btn-link row-action" data-unpair="${o.id}">Zrušit spárování</button>`;
+        } else {
+          badge = `<span class="row-badge kontrola">Čeká na kontrolu</span>`;
+          action = `<button class="btn-link row-action" data-reedit="${o.id}">Vrátit k úpravě</button>`;
+        }
+        return `
+        <div class="list-row">
+          <div class="row-thumb"><i class="fas ${o.icon}"></i></div>
+          <div class="row-main">
+            <div class="row-name">${escapeHTML(o.name)}</div>
+            <div class="row-meta">${escapeHTML(catShortOf(o))} · EAN: ${o.ean}</div>
+          </div>
+          <div class="row-price">${o.price.toLocaleString('cs-CZ')} Kč</div>
+          ${badge}
+          ${action}
+        </div>`;
+      }).join('');
+    }
+    content.innerHTML = `
+      <div class="list-header">
+        <h2>${titles[bucket]} <span style="color:var(--text-secondary); font-weight:400; font-size:14px;">(${list.length})</span></h2>
+        <button type="button" class="back-link" id="backToQueue"><i class="fas fa-arrow-left"></i> Zpět na frontu</button>
+      </div>
+      ${rowsHTML}`;
+    document.getElementById('backToQueue').addEventListener('click', () => { viewMode = 'queue'; render(); });
+    content.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+      pinnedId = b.dataset.open; viewMode = 'queue'; hideToast(); render();
+    }));
+    content.querySelectorAll('[data-unpair]').forEach(b => b.addEventListener('click', () => {
+      const o = offers.find(x => x.id === b.dataset.unpair);
+      o.status = 'pending'; pinnedId = o.id; postponed.delete(o.id); viewMode = 'queue'; hideToast(); render();
+    }));
+    content.querySelectorAll('[data-reedit]').forEach(b => b.addEventListener('click', () => {
+      const o = offers.find(x => x.id === b.dataset.reedit);
+      o.status = 'pending'; o.matched = false; pinnedId = o.id; postponed.delete(o.id); viewMode = 'queue'; hideToast(); render();
+    }));
   }
 
   const escapeHTML = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -360,8 +485,9 @@
 
   function render() {
     renderProgress();
-    const queue = currentQueue();
     const content = document.getElementById('content');
+    if (viewMode !== 'queue') { renderListView(viewMode); return; }
+    const queue = currentQueue();
     if (!queue.length) {
       const c = counts();
       content.innerHTML = `
@@ -374,6 +500,7 @@
       document.getElementById('resetBtn').addEventListener('click', () => {
         offers.forEach(o => { o.status = 'pending'; }); postponed.clear();
         Object.keys(editedNames).forEach(k => delete editedNames[k]);
+        pinnedId = null; viewMode = 'queue';
         hideToast(); render();
       });
       return;
@@ -436,6 +563,7 @@
     if (o.matched) {
       document.getElementById('confirmBtn').addEventListener('click', () => {
         o.status = 'parovano'; postponed.delete(o.id);
+        if (pinnedId === o.id) pinnedId = null;
         showToast(`✓ „${o.name}“ bylo spárováno.`);
         render();
       });
@@ -451,11 +579,14 @@
       document.getElementById('submitBtn').addEventListener('click', () => {
         o.name = editedNames[o.id] ?? o.name;
         o.status = 'kontrola'; postponed.delete(o.id);
+        if (pinnedId === o.id) pinnedId = null;
         showToast(`✓ „${o.name}“ odesláno ke kontrole.`);
         render();
       });
       document.getElementById('postponeBtn').addEventListener('click', () => {
-        postponed.add(o.id); hideToast(); render();
+        postponed.add(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        hideToast(); render();
       });
     }
   }
