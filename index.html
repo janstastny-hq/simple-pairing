@@ -32,14 +32,22 @@
   .page-lede { color: var(--text-secondary); max-width: 760px; margin: 0 0 28px; font-size: 14.5px; }
 
   .toolbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; }
-  .sort-group { display: flex; align-items: center; gap: 10px; }
-  .sort-label { font-weight: 600; color: var(--text-dark); font-size: 14px; }
-  .segmented { display: inline-flex; flex-wrap: wrap; background: #eef0f2; border-radius: 10px; padding: 4px; gap: 2px; }
-  .segmented button {
-    border: none; background: transparent; padding: 7px 16px; border-radius: 8px; font-size: 13.5px;
-    color: var(--text-secondary); font-family: inherit; cursor: pointer; font-weight: 500;
+  .filter-group { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .category-select {
+    border: 1px solid var(--border-color); background: var(--background-card); color: var(--text-dark);
+    border-radius: 10px; padding: 9px 32px 9px 14px; font-size: 13.5px; font-family: inherit; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236c757d' stroke-width='1.5' fill='none' fill-rule='evenodd'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
   }
-  .segmented button.active { background: #fff; color: var(--text-dark); font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+  .category-select:focus { outline: none; border-color: var(--primary-blue); }
+  .search-input-wrap { position: relative; display: flex; align-items: center; }
+  .search-input-wrap i { position: absolute; left: 13px; color: var(--text-secondary); font-size: 13px; }
+  .search-input-wrap input {
+    border: 1px solid var(--border-color); background: var(--background-card); border-radius: 10px;
+    padding: 9px 14px 9px 34px; font-size: 13.5px; font-family: inherit; width: 260px;
+  }
+  .search-input-wrap input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 .2rem rgba(0,114,206,.15); }
 
   .progress-line { display: flex; gap: 10px; flex-wrap: wrap; }
   .stat-btn {
@@ -167,6 +175,19 @@
   .category-chosen .cat-chosen-text { font-size: 13.5px; font-weight: 600; color: #12805c; }
   .category-chosen .cat-change-link { background:none; border:none; color: var(--primary-blue); font-size: 12.5px; text-decoration: underline; cursor: pointer; font-family: inherit; flex-shrink: 0; }
 
+  .params-editor { width: 100%; text-align: left; }
+  .params-editor label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 10px; }
+  .param-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .param-row .param-label { flex: 0 0 130px; font-size: 13px; color: var(--text-dark); font-weight: 600; }
+  .param-row input {
+    flex: 1 1 auto; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 13.5px;
+    font-family: inherit;
+  }
+  .param-row input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 .2rem rgba(0,114,206,.2); }
+  .param-row.filled input { border-color: #b7e4cf; background: var(--success-soft); }
+  .param-row .param-check { flex: 0 0 16px; color: var(--success-color); opacity: 0; }
+  .param-row.filled .param-check { opacity: 1; }
+
   .actions-col { flex: 0 0 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
   @media (max-width: 900px) { .actions-col { flex-direction: row; } }
   .btn-primary {
@@ -187,9 +208,8 @@
   .sock-icon { width: 56px; height: 56px; }
 
   @media (max-width: 480px) {
-    .sort-group { width: 100%; flex-direction: column; align-items: flex-start; }
-    .segmented { width: 100%; }
-    .segmented button { flex: 1 1 auto; }
+    .filter-group { width: 100%; flex-direction: column; align-items: stretch; }
+    .category-select, .search-input-wrap input { width: 100%; }
   }
 
   @media (max-width: 620px) {
@@ -209,12 +229,11 @@
 
   <div class="toolbar">
     <div class="progress-line" id="progressLine"></div>
-    <div class="sort-group">
-      <span class="sort-label">Seřadit:</span>
-      <div class="segmented" id="sortSeg">
-        <button data-sort="abc" class="active">Abecedně</button>
-        <button data-sort="priceDesc">Od nejdražších</button>
-        <button data-sort="priceAsc">Od nejlevnějších</button>
+    <div class="filter-group">
+      <select id="categorySelect" class="category-select"></select>
+      <div class="search-input-wrap">
+        <i class="fas fa-magnifying-glass"></i>
+        <input type="search" id="offerSearch" placeholder="Hledat nabídku podle názvu nebo EAN…" autocomplete="off">
       </div>
     </div>
   </div>
@@ -350,6 +369,17 @@
     return { format, komponenty, chybejici: komponenty.filter(k => k.stav === 'chybi').map(k => k.label) };
   }
 
+  // Povinné parametry dané kategorie, které u nabídky ještě chybí.
+  function requiredParams(offer) {
+    return parseParams(najdiPresne(leafOf(offer.categoryText), PARAMS));
+  }
+  function missingRequiredParams(offer) {
+    const required = requiredParams(offer);
+    if (!required.length) return [];
+    const filled = (offer.params || []).map(dejZakladSlova);
+    return required.filter(r => { const rz = dejZakladSlova(r); return !filled.some(f => f === rz || f.includes(rz) || rz.includes(f)); });
+  }
+
   /* ============ 20 UKÁZKOVÝCH NABÍDEK ============ */
   const D = 'https://www.eshop-ukazka.cz';
   const CAT = {
@@ -370,7 +400,7 @@
   const off = (name, categoryText, manufacturer, price, matched, opts = {}) => {
     uid++;
     return { id: 'OFR' + String(uid).padStart(3, '0'), name, categoryText, manufacturer, price, ean: ean(880000000000 + uid * 37), matched,
-      matchedName: opts.matchedName || name, icon: opts.icon || 'fa-box', status: 'pending' };
+      matchedName: opts.matchedName || name, icon: opts.icon || 'fa-box', status: 'pending', params: opts.params || [] };
   };
 
   const offers = [
@@ -398,27 +428,38 @@
     off('Bezdrátová sluchátka SoundBlast Go', '', '', 990, false, { icon: 'fa-headphones' }),
     off('Kuchyňský robot ProfiCook MasterChef Edition', 'Heureka.cz | Ostatní', '', 3490, false, { icon: 'fa-blender' }),
     off('Antivirový software ProGuard roční licence', 'Heureka.cz | Elektronika', '', 590, false, { icon: 'fa-shield-halved' }),
+    off('Dakine Trail batoh šedý 20l', CAT.batohy, 'Dakine', 1590, false, { icon: 'fa-bag-shopping' }),
+    off('Dakine Cross batoh modrý 15l', CAT.batohy, 'Dakine', 1190, false, { icon: 'fa-bag-shopping' }),
+    off('Osprey Daylite batoh zelený 12l', CAT.batohy, 'Osprey', 1690, false, { icon: 'fa-bag-shopping' }),
   ];
   const initialSnapshot = {};
   offers.forEach(o => { initialSnapshot[o.id] = { name: o.name, categoryText: o.categoryText }; });
 
   /* ============ STAV ============ */
-  let sortMode = 'abc';
   let viewMode = 'nesparovano'; // 'nesparovano' (výchozí — všechny nespárované pod sebou) | 'parovano' | 'kontrola'
   let pinnedId = null;
   let problemFilter = 'all'; // filtr v seznamu "Nespárováno" podle typu problému
+  let categoryFilter = 'all'; // filtr podle kategorie, kam se nabídky posílají
+  let searchQuery = ''; // hledání konkrétní nabídky podle názvu/EAN
   const postponed = new Set();
   const editedNames = {};
+  const editedParams = {}; // offer.id -> { paramName: hodnota }
 
-  const sortCmp = () => sortMode === 'priceDesc' ? (a, b) => b.price - a.price
-    : sortMode === 'priceAsc' ? (a, b) => a.price - b.price
-    : (a, b) => a.name.localeCompare(b.name, 'cs');
+  const categoryKeyOf = o => o.categoryText ? leafOf(o.categoryText) : '__none__';
+  const capitalize = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
+  function applyFilters(list) {
+    let out = list;
+    if (categoryFilter !== 'all') out = out.filter(o => categoryKeyOf(o) === categoryFilter);
+    const q = fold(searchQuery.trim());
+    if (q) out = out.filter(o => fold(o.name).includes(q) || fold(o.ean).includes(q));
+    return out.slice().sort((a, b) => a.name.localeCompare(b.name, 'cs'));
+  }
 
   function currentQueue() {
-    const pending = offers.filter(o => o.status === 'pending');
-    const cmp = sortCmp();
-    const notPostponed = pending.filter(o => !postponed.has(o.id)).sort(cmp);
-    const isPostponed = pending.filter(o => postponed.has(o.id)).sort(cmp);
+    const pending = applyFilters(offers.filter(o => o.status === 'pending'));
+    const notPostponed = pending.filter(o => !postponed.has(o.id));
+    const isPostponed = pending.filter(o => postponed.has(o.id));
     let list = [...notPostponed, ...isPostponed];
     if (pinnedId) {
       const idx = list.findIndex(o => o.id === pinnedId);
@@ -431,9 +472,8 @@
     const filtered = offers.filter(o => bucket === 'parovano' ? o.status === 'parovano'
       : bucket === 'kontrola' ? o.status === 'kontrola'
       : o.status === 'pending');
-    return filtered.sort(sortCmp());
+    return applyFilters(filtered);
   }
-
   function counts() {
     return {
       total: offers.length,
@@ -477,11 +517,15 @@
   function problemType(o) {
     if (!o.categoryText || !isValidCategory(o.categoryText)) return 'category';
     if (o.matched) return 'match-pending';
+    const diag = diagnostikaNazvu(o, editedNames[o.id] ?? o.name);
+    const nameOk = !!diag && diag.chybejici.length === 0;
+    if (nameOk && missingRequiredParams(o).length) return 'params';
     return 'name';
   }
   const PROBLEM_LABELS = {
     'category': { label: 'Chybná kategorie', cls: 'unmatched' },
     'name': { label: 'Chybný název', cls: 'unmatched' },
+    'params': { label: 'Párování parametrů', cls: 'unmatched' },
     'match-pending': { label: 'Ke spárování', cls: 'matched' },
   };
 
@@ -583,11 +627,30 @@
   }
 
   // Vykreslí JEDNU nabídku jako plnou interaktivní kartu (stejný vzhled, jaký měl dřív jen "otevřený" záznam).
+  function paramsFormHTML(o) {
+    const leaf = leafOf(o.categoryText);
+    const missing = missingRequiredParams(o);
+    const vals = editedParams[o.id] || {};
+    return `
+      <div class="params-editor">
+        <label>Vyplňte chybějící povinné parametry pro kategorii „${escapeHTML(leaf)}“:</label>
+        ${missing.map(p => `
+          <div class="param-row${vals[p] ? ' filled' : ''}" data-param-row="${escapeHTML(p)}">
+            <span class="param-label">${escapeHTML(p)}</span>
+            <input type="text" data-param-input="${escapeHTML(p)}" placeholder="Zadejte hodnotu…" value="${escapeHTML(vals[p] || '')}">
+            <i class="fas fa-circle-check param-check"></i>
+          </div>`).join('')}
+      </div>`;
+  }
+
   function renderOfferCardHTML(o) {
     const catShort = o.categoryText ? o.categoryText.split('|').map(s => s.trim()).slice(-3).join(' | ') : '';
     const currentName = editedNames[o.id] ?? o.name;
     const needsCategory = !o.categoryText || !isValidCategory(o.categoryText) || forceRecat.has(o.id);
     const invalidCategory = o.categoryText && !isValidCategory(o.categoryText);
+    const nameDiag = !needsCategory ? diagnostikaNazvu(o, currentName) : null;
+    const nameOk = !!nameDiag && nameDiag.chybejici.length === 0;
+    const needsParams = !o.matched && !needsCategory && nameOk && missingRequiredParams(o).length > 0;
 
     let rightHTML = '';
     let actionsHTML = '';
@@ -618,6 +681,16 @@
           ${categoryPickerHTML(o)}
         </div>`;
       actionsHTML = `<button class="btn-link" data-act="postpone">Odložit</button>`;
+    } else if (needsParams) {
+      rightHTML = `
+        <div class="status-box">
+          ${sockSvg}
+          <div class="empty-text">Název i kategorie jsou v pořádku, ale pro spárování ještě chybí povinné parametry.</div>
+          ${paramsFormHTML(o)}
+        </div>`;
+      actionsHTML = `
+        <button class="btn-primary" data-act="submit-params">Odeslat ke kontrole</button>
+        <button class="btn-link" data-act="postpone">Odložit</button>`;
     } else {
       rightHTML = `
         <div class="status-box">
@@ -653,6 +726,10 @@
   // Připojí event listenery pro jednu vykreslenou kartu (podle data-oid).
   function wireOfferCard(o, cardEl) {
     const needsCategory = !o.categoryText || !isValidCategory(o.categoryText) || forceRecat.has(o.id);
+    const currentName = editedNames[o.id] ?? o.name;
+    const nameDiag = !needsCategory ? diagnostikaNazvu(o, currentName) : null;
+    const nameOk = !!nameDiag && nameDiag.chybejici.length === 0;
+    const needsParams = !o.matched && !needsCategory && nameOk && missingRequiredParams(o).length > 0;
 
     if (o.matched) {
       cardEl.querySelector('[data-act="confirm"]').addEventListener('click', () => {
@@ -683,6 +760,29 @@
         if (pinnedId === o.id) pinnedId = null;
         hideToast(); render();
       });
+    } else if (needsParams) {
+      cardEl.querySelectorAll('[data-param-input]').forEach(input => {
+        const p = input.dataset.paramInput;
+        input.addEventListener('input', () => {
+          if (!editedParams[o.id]) editedParams[o.id] = {};
+          editedParams[o.id][p] = input.value;
+          input.closest('.param-row').classList.toggle('filled', !!input.value.trim());
+        });
+      });
+      cardEl.querySelector('[data-act="submit-params"]').addEventListener('click', () => {
+        const vals = editedParams[o.id] || {};
+        const newParams = Object.keys(vals).filter(p => vals[p] && vals[p].trim());
+        o.params = [...(o.params || []), ...newParams];
+        o.status = 'kontrola'; postponed.delete(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        showToast(`✓ „${o.name}“ odesláno ke kontrole.`);
+        render();
+      });
+      cardEl.querySelector('[data-act="postpone"]').addEventListener('click', () => {
+        postponed.add(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        hideToast(); render();
+      });
     } else {
       const input = cardEl.querySelector(`#nameInput-${o.id}`);
       input.addEventListener('input', () => {
@@ -707,8 +807,19 @@
     }
   }
 
+  function renderCategoryFilter() {
+    const sel = document.getElementById('categorySelect');
+    const counts = new Map();
+    offers.forEach(o => { const k = categoryKeyOf(o); counts.set(k, (counts.get(k) || 0) + 1); });
+    const entries = [...counts.entries()].sort((a, b) => (a[0] === '__none__' ? 1 : b[0] === '__none__' ? -1 : a[0].localeCompare(b[0], 'cs')));
+    sel.innerHTML = `<option value="all">Všechny kategorie (${offers.length})</option>` +
+      entries.map(([key, count]) => `<option value="${escapeHTML(key)}">${escapeHTML(key === '__none__' ? 'Bez kategorie' : capitalize(key))} (${count})</option>`).join('');
+    sel.value = categoryFilter;
+  }
+
   function render() {
     renderProgress();
+    renderCategoryFilter();
     const content = document.getElementById('content');
     if (viewMode === 'parovano' || viewMode === 'kontrola') { renderListView(viewMode); return; }
 
@@ -733,6 +844,8 @@
         Object.keys(editedNames).forEach(k => delete editedNames[k]);
         Object.keys(categorySearch).forEach(k => delete categorySearch[k]);
         pinnedId = null; viewMode = 'nesparovano'; problemFilter = 'all';
+        categoryFilter = 'all'; searchQuery = '';
+        document.getElementById('offerSearch').value = '';
         hideToast(); render();
       });
       return;
@@ -770,12 +883,11 @@
     }
   }
 
-  document.getElementById('sortSeg').addEventListener('click', e => {
-    const btn = e.target.closest('button[data-sort]');
-    if (!btn) return;
-    sortMode = btn.dataset.sort;
-    document.querySelectorAll('#sortSeg button').forEach(b => b.classList.toggle('active', b === btn));
-    render();
+  document.getElementById('categorySelect').addEventListener('change', e => {
+    categoryFilter = e.target.value; render();
+  });
+  document.getElementById('offerSearch').addEventListener('input', e => {
+    searchQuery = e.target.value; render();
   });
 
   render();
