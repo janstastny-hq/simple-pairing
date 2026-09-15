@@ -475,14 +475,12 @@
 
   // Typ problému nespárované nabídky — pro filtr/řazení v seznamu "Nespárováno".
   function problemType(o) {
-    if (!o.categoryText) return 'no-category';
-    if (!isValidCategory(o.categoryText)) return 'invalid-category';
+    if (!o.categoryText || !isValidCategory(o.categoryText)) return 'category';
     if (o.matched) return 'match-pending';
     return 'name';
   }
   const PROBLEM_LABELS = {
-    'no-category': { label: 'Chybí kategorie', cls: 'unmatched' },
-    'invalid-category': { label: 'Nedostatečná kategorie', cls: 'unmatched' },
+    'category': { label: 'Chybná kategorie', cls: 'unmatched' },
     'name': { label: 'Chybný název', cls: 'unmatched' },
     'match-pending': { label: 'Ke spárování', cls: 'matched' },
   };
