@@ -20,6 +20,7 @@
     --danger-soft: #fdeceb;
     --warning-color: #fd7e14;
     --warning-soft: #fff3e8;
+    --neutral-soft: #eceef1;
     --font-family-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     --border-radius: .5rem;
   }
@@ -49,6 +50,12 @@
   .stat-btn:hover { border-color: #b9c1c9; }
   .stat-btn b { color: var(--text-dark); font-size: 14.5px; }
   .stat-btn .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+  .stat-btn.tint-parovano:not(.active) { background: var(--success-soft); border-color: #b7e4cf; }
+  .stat-btn.tint-parovano:not(.active) b { color: #12805c; }
+  .stat-btn.tint-nesparovano:not(.active) { background: var(--danger-soft); border-color: #f5c6c1; }
+  .stat-btn.tint-nesparovano:not(.active) b { color: var(--danger-color); }
+  .stat-btn.tint-kontrola:not(.active) { background: var(--neutral-soft); border-color: #d7dbe0; }
+  .stat-btn.tint-kontrola:not(.active) b { color: var(--text-dark); }
   .stat-btn.active { border-color: var(--primary-blue); background: #eaf2fb; box-shadow: 0 0 0 1px var(--primary-blue) inset; }
   .stat-btn.total { cursor: default; }
   .stat-btn.total:hover { border-color: var(--border-color); }
@@ -57,6 +64,16 @@
   .list-header h2 { font-size: 18px; margin: 0; }
   .back-link { background: none; border: none; color: var(--primary-blue); font-size: 13.5px; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: 6px; padding: 0; }
   .back-link:hover { text-decoration: underline; }
+
+  .problem-filter-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+  .problem-filter-btn {
+    border: 1px solid var(--border-color); background: var(--background-card); color: var(--text-secondary);
+    border-radius: 16px; padding: 7px 14px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+    display: inline-flex; align-items: center; gap: 7px; transition: all .15s ease;
+  }
+  .problem-filter-btn:hover:not(.active) { border-color: #b9c1c9; }
+  .problem-filter-btn.active { border-color: var(--primary-blue); background: #eaf2fb; color: var(--primary-blue); font-weight: 700; }
+  .problem-filter-btn .count { font-size: 11.5px; font-weight: 700; }
 
   .list-row {
     display: flex; align-items: center; gap: 16px; background: var(--background-card); border: 1px solid var(--border-color);
@@ -125,6 +142,31 @@
   .chip.manual { background: #eaf2fb; color: var(--primary-blue); border-color: #cfe2f6; }
   .all-good { font-size: 13px; color: #12805c; font-weight: 600; display: flex; align-items: center; gap: 6px; margin-top: 2px; }
 
+  .cat-missing-inline { color: var(--danger-color); font-style: italic; }
+  .category-picker { width: 100%; text-align: left; }
+  .cat-invalid-note { font-size: 12.5px; color: var(--danger-color); background: var(--danger-soft); border: 1px solid #f5c6c1; border-radius: 6px; padding: 7px 10px; margin-bottom: 10px; }
+  .category-picker label { display: block; font-size: 12.5px; font-weight: 600; color: var(--text-dark); margin-bottom: 8px; }
+  .category-picker input {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 14px;
+    font-family: inherit; margin-bottom: 4px;
+  }
+  .category-picker input:focus { outline: none; border-color: var(--primary-blue); box-shadow: 0 0 0 .2rem rgba(0,114,206,.2); }
+  .category-results { max-height: 220px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; margin-top: 8px; background: #fff; }
+  .category-results .cat-option {
+    display: flex; flex-direction: column; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid #f0f1f3;
+  }
+  .category-results .cat-option:last-child { border-bottom: none; }
+  .category-results .cat-option:hover { background: #eaf2fb; }
+  .category-results .cat-option .cat-leaf { font-weight: 600; font-size: 13.5px; color: var(--text-dark); }
+  .category-results .cat-option .cat-parent { font-size: 11.5px; color: var(--text-secondary); }
+  .category-results .cat-empty { padding: 12px; font-size: 13px; color: var(--text-secondary); text-align: center; }
+  .category-chosen {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--success-soft);
+    border: 1px solid #b7e4cf; border-radius: 8px; padding: 10px 12px; margin-top: 4px;
+  }
+  .category-chosen .cat-chosen-text { font-size: 13.5px; font-weight: 600; color: #12805c; }
+  .category-chosen .cat-change-link { background:none; border:none; color: var(--primary-blue); font-size: 12.5px; text-decoration: underline; cursor: pointer; font-family: inherit; flex-shrink: 0; }
+
   .actions-col { flex: 0 0 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
   @media (max-width: 900px) { .actions-col { flex-direction: row; } }
   .btn-primary {
@@ -166,6 +208,7 @@
   <p class="page-lede">Všechny nabídky z vašeho feedu procházíme automaticky přes shodu EAN kódu. Tady je projdete jednu po druhé — u shody stačí párování potvrdit, u nabídky bez shody rovnou opravíte název podle toho, co jí podle vzoru kategorie na Heurece chybí, a pošlete ji ke kontrole.</p>
 
   <div class="toolbar">
+    <div class="progress-line" id="progressLine"></div>
     <div class="sort-group">
       <span class="sort-label">Seřadit:</span>
       <div class="segmented" id="sortSeg">
@@ -174,7 +217,6 @@
         <button data-sort="priceAsc">Od nejlevnějších</button>
       </div>
     </div>
-    <div class="progress-line" id="progressLine"></div>
   </div>
 
   <div class="toast" id="toast"></div>
@@ -185,13 +227,24 @@
 <script>
 (async function () {
   /* ============ VALIDÁTOR NÁZVU (stejná logika jako Feed validátor / Přehled spárovanosti) ============ */
-  let RULES = {}, PARAMS = {};
+  let RULES = {}, PARAMS = {}, CATEGORIES = [];
   try {
     const proto = await (await fetch('./proto-data.json')).json();
-    RULES = proto.rules || {}; PARAMS = proto.params || {};
+    RULES = proto.rules || {}; PARAMS = proto.params || {}; CATEGORIES = proto.categories || [];
   } catch (e) { console.error('proto-data.json se nepodařilo načíst', e); }
 
   const fold = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+  // Pro výběr kategorie: ukazujeme jen koncovou (poslední) kategorii, ale k nabídce se uloží celá cesta.
+  const CATEGORY_OPTIONS = CATEGORIES.map(full => {
+    const parts = full.split('|').map(s => s.trim());
+    const leaf = parts[parts.length - 1];
+    return { full, leaf, parent: parts.slice(-3, -1).join(' | '), foldedLeaf: fold(leaf) };
+  });
+  // Kategorie je "platná", jen pokud přesně odpovídá existující koncové cestě ve stromu Heureky.
+  // Pokud ne, jde o příliš obecnou/neexistující kategorii (např. jen "Elektronika" bez dalšího zařazení).
+  const VALID_CATEGORY_SET = new Set(CATEGORIES.map(c => c.trim()));
+  const isValidCategory = text => VALID_CATEGORY_SET.has((text || '').trim());
   function dejZakladSlova(slovo) {
     slovo = fold(slovo);
     if (slovo.length <= 3) return slovo;
@@ -322,7 +375,7 @@
 
   const offers = [
     off('Mami\'s Caffé Espresso Crema zrnková káva', CAT.kava, "Mami's Caffé", 349, false, { icon: 'fa-mug-hot' }),
-    off('Dakine Pivot batoh zelený 25l', CAT.batohy, 'Dakine', 1290, true, { icon: 'fa-backpack', matchedName: 'Dakine Pivot batoh zelený 25l' }),
+    off('Dakine Pivot batoh zelený 25l', CAT.batohy, 'Dakine', 1290, true, { icon: 'fa-bag-shopping', matchedName: 'Dakine Pivot batoh zelený 25l' }),
     off('Nebbia šortky 343 černá', CAT.sortky, 'Nebbia', 690, false, { icon: 'fa-person' }),
     off('Niceboy RAZE 3', CAT.reproduktory, 'Niceboy', 890, false, { icon: 'fa-volume-high' }),
     off('Nikon D3100 Red', CAT.fotoaparaty, 'Nikon', 8990, false, { icon: 'fa-camera' }),
@@ -332,7 +385,7 @@
     off('Tajemství Julie Garwoodová', CAT.knihy, '', 249, true, { icon: 'fa-book', matchedName: 'Tajemství - Julie Garwoodová (brož.)' }),
     off('i-Tec PB3400', CAT.powerbanky, 'i-Tec', 590, true, { icon: 'fa-battery-full', matchedName: 'i-Tec PB3400' }),
     off('Alpine Pro Elkini 3 dětská mikina', CAT.mikiny, 'Alpine Pro', 790, false, { icon: 'fa-shirt' }),
-    off('Dakine Pivot batoh 30l', CAT.batohy, 'Dakine', 1390, false, { icon: 'fa-backpack' }),
+    off('Dakine Pivot batoh 30l', CAT.batohy, 'Dakine', 1390, false, { icon: 'fa-bag-shopping' }),
     off('GoPro HERO7 Black Edition', CAT.fotoaparaty, 'GoPro', 6490, true, { icon: 'fa-camera', matchedName: 'GoPro HERO7 Black Edition' }),
     off('JBL Charge 6', CAT.reproduktory, 'JBL', 3290, false, { icon: 'fa-volume-high' }),
     off('Mokka Brazil zrnková káva 1kg', CAT.kava, 'Mokka', 429, false, { icon: 'fa-mug-hot' }),
@@ -341,12 +394,19 @@
     off('Predator X TRX FG Black EUR 42', CAT.kopacky, 'Adidas', 2190, true, { icon: 'fa-futbol', matchedName: 'Predator X TRX FG Black/White/Cyan EUR 42' }),
     off('Roadstar PCD-435CD/RD červená', CAT.cdprehravace, 'Roadstar', 2490, false, { icon: 'fa-compact-disc' }),
     off('Terry Pratchett Barva kouzel', CAT.knihy, '', 279, true, { icon: 'fa-book', matchedName: 'Barva kouzel - Terry Pratchett (brož.)' }),
+    off('Thule EnRoute batoh černý 23l', '', 'Thule', 1490, false, { icon: 'fa-bag-shopping' }),
+    off('Bezdrátová sluchátka SoundBlast Go', '', '', 990, false, { icon: 'fa-headphones' }),
+    off('Kuchyňský robot ProfiCook MasterChef Edition', 'Heureka.cz | Ostatní', '', 3490, false, { icon: 'fa-blender' }),
+    off('Antivirový software ProGuard roční licence', 'Heureka.cz | Elektronika', '', 590, false, { icon: 'fa-shield-halved' }),
   ];
+  const initialSnapshot = {};
+  offers.forEach(o => { initialSnapshot[o.id] = { name: o.name, categoryText: o.categoryText }; });
 
   /* ============ STAV ============ */
   let sortMode = 'abc';
-  let viewMode = 'queue'; // 'queue' | 'parovano' | 'nesparovano' | 'kontrola'
+  let viewMode = 'nesparovano'; // 'nesparovano' (výchozí — všechny nespárované pod sebou) | 'parovano' | 'kontrola'
   let pinnedId = null;
+  let problemFilter = 'all'; // filtr v seznamu "Nespárováno" podle typu problému
   const postponed = new Set();
   const editedNames = {};
 
@@ -393,39 +453,52 @@
     const c = counts();
     const line = document.getElementById('progressLine');
     const btn = (bucket, color, label, value) => `
-      <button type="button" class="stat-btn${viewMode === bucket ? ' active' : ''}" data-bucket="${bucket}">
+      <button type="button" class="stat-btn tint-${bucket}${viewMode === bucket ? ' active' : ''}" data-bucket="${bucket}">
         <span class="dot" style="background:${color}"></span>${label}: <b>${value}</b>
       </button>`;
     line.innerHTML = [
       btn('parovano', 'var(--success-color)', 'Spárováno', c.parovano),
-      btn('nesparovano', '#adb5bd', 'Nespárováno', c.zbyva),
-      btn('kontrola', 'var(--warning-color)', 'Čekající', c.kontrola),
+      btn('nesparovano', 'var(--danger-color)', 'Nespárováno', c.zbyva),
+      btn('kontrola', '#9aa4b2', 'Čekající', c.kontrola),
       `<span class="stat-btn total">Celkem: <b>${c.total}</b></span>`,
     ].join('');
     line.querySelectorAll('button[data-bucket]').forEach(b => b.addEventListener('click', () => {
       const bucket = b.dataset.bucket;
-      viewMode = viewMode === bucket ? 'queue' : bucket;
+      viewMode = viewMode === bucket ? 'nesparovano' : bucket;
+      problemFilter = 'all';
       hideToast();
       render();
     }));
   }
 
-  function catShortOf(o) { return o.categoryText.split('|').map(s => s.trim()).slice(-3).join(' | '); }
+  function catShortOf(o) { return o.categoryText ? o.categoryText.split('|').map(s => s.trim()).slice(-3).join(' | ') : 'kategorie nevyplněná'; }
+
+  // Typ problému nespárované nabídky — pro filtr/řazení v seznamu "Nespárováno".
+  function problemType(o) {
+    if (!o.categoryText) return 'no-category';
+    if (!isValidCategory(o.categoryText)) return 'invalid-category';
+    if (o.matched) return 'match-pending';
+    return 'name';
+  }
+  const PROBLEM_LABELS = {
+    'no-category': { label: 'Chybí kategorie', cls: 'unmatched' },
+    'invalid-category': { label: 'Nedostatečná kategorie', cls: 'unmatched' },
+    'name': { label: 'Chybný název', cls: 'unmatched' },
+    'match-pending': { label: 'Ke spárování', cls: 'matched' },
+  };
 
   function renderListView(bucket) {
     const content = document.getElementById('content');
     const list = bucketOffers(bucket);
-    const titles = { parovano: 'Spárované nabídky', nesparovano: 'Nespárované nabídky', kontrola: 'Čekající na kontrolu' };
+    const titles = { parovano: 'Spárované nabídky', kontrola: 'Čekající na kontrolu' };
+
     let rowsHTML = '';
     if (!list.length) {
       rowsHTML = `<div class="empty-list">V této skupině zatím nejsou žádné nabídky.</div>`;
     } else {
       rowsHTML = list.map(o => {
         let badge = '', action = '';
-        if (bucket === 'nesparovano') {
-          badge = o.matched ? `<span class="row-badge matched">Shoda nalezena</span>` : `<span class="row-badge unmatched">Shoda nenalezena</span>`;
-          action = `<button class="btn-primary row-action" style="width:auto;" data-open="${o.id}">Otevřít</button>`;
-        } else if (bucket === 'parovano') {
+        if (bucket === 'parovano') {
           badge = `<span class="row-badge matched">Spárováno</span>`;
           action = `<button class="btn-link row-action" data-unpair="${o.id}">Zrušit spárování</button>`;
         } else {
@@ -448,20 +521,17 @@
     content.innerHTML = `
       <div class="list-header">
         <h2>${titles[bucket]} <span style="color:var(--text-secondary); font-weight:400; font-size:14px;">(${list.length})</span></h2>
-        <button type="button" class="back-link" id="backToQueue"><i class="fas fa-arrow-left"></i> Zpět na frontu</button>
+        <button type="button" class="back-link" id="backToQueue"><i class="fas fa-arrow-left"></i> Zpět na nespárované</button>
       </div>
       ${rowsHTML}`;
-    document.getElementById('backToQueue').addEventListener('click', () => { viewMode = 'queue'; render(); });
-    content.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
-      pinnedId = b.dataset.open; viewMode = 'queue'; hideToast(); render();
-    }));
+    document.getElementById('backToQueue').addEventListener('click', () => { viewMode = 'nesparovano'; problemFilter = 'all'; render(); });
     content.querySelectorAll('[data-unpair]').forEach(b => b.addEventListener('click', () => {
       const o = offers.find(x => x.id === b.dataset.unpair);
-      o.status = 'pending'; pinnedId = o.id; postponed.delete(o.id); viewMode = 'queue'; hideToast(); render();
+      o.status = 'pending'; pinnedId = o.id; postponed.delete(o.id); viewMode = 'nesparovano'; hideToast(); render();
     }));
     content.querySelectorAll('[data-reedit]').forEach(b => b.addEventListener('click', () => {
       const o = offers.find(x => x.id === b.dataset.reedit);
-      o.status = 'pending'; o.matched = false; pinnedId = o.id; postponed.delete(o.id); viewMode = 'queue'; hideToast(); render();
+      o.status = 'pending'; o.matched = false; pinnedId = o.id; postponed.delete(o.id); viewMode = 'nesparovano'; hideToast(); render();
     }));
   }
 
@@ -483,11 +553,169 @@
       ${!chybi.length ? `<div class="all-good"><i class="fas fa-circle-check"></i> Podle vzoru kategorie už nic nechybí</div>` : ''}`;
   }
 
+  /* ============ VÝBĚR KATEGORIE (chybějící kategorie u nabídky) ============ */
+  const categorySearch = {};   // offer.id -> rozepsaný hledaný text
+  const forceRecat = new Set(); // offer.id -> uživatel chce kategorii změnit i když už je vyplněná
+
+  function categoryResultsHTML(query) {
+    const q = fold(query.trim());
+    if (!q) return `<div class="cat-empty">Začněte psát název koncové kategorie (např. „batohy“, „sluchátka“…).</div>`;
+    const matches = CATEGORY_OPTIONS.filter(c => c.foldedLeaf.includes(q)).slice(0, 30);
+    if (!matches.length) return `<div class="cat-empty">Žádná kategorie neodpovídá hledání.</div>`;
+    return matches.map(c => `
+      <div class="cat-option" data-full="${escapeHTML(c.full)}">
+        <span class="cat-leaf">${escapeHTML(c.leaf)}</span>
+        ${c.parent ? `<span class="cat-parent">${escapeHTML(c.parent)}</span>` : ''}
+      </div>`).join('');
+  }
+
+  function categoryPickerHTML(offer) {
+    const q = categorySearch[offer.id] ?? '';
+    const hasInvalid = offer.categoryText && !isValidCategory(offer.categoryText);
+    const label = hasInvalid
+      ? 'Zaslaná kategorie neodpovídá žádné konkrétní kategorii na Heurece — vyberte prosím správnou koncovou kategorii:'
+      : 'Tato nabídka nemá přiřazenou kategorii — vyberte koncovou kategorii z nabídky Heureky:';
+    return `
+      <div class="category-picker">
+        ${hasInvalid ? `<div class="cat-invalid-note">Zaslaná kategorie: <strong>${escapeHTML(offer.categoryText)}</strong></div>` : ''}
+        <label>${label}</label>
+        <input type="text" id="categoryInput-${offer.id}" placeholder="Hledat koncovou kategorii…" value="${escapeHTML(q)}" autocomplete="off">
+        <div class="category-results" id="categoryResults-${offer.id}">${categoryResultsHTML(q)}</div>
+      </div>`;
+  }
+
+  // Vykreslí JEDNU nabídku jako plnou interaktivní kartu (stejný vzhled, jaký měl dřív jen "otevřený" záznam).
+  function renderOfferCardHTML(o) {
+    const catShort = o.categoryText ? o.categoryText.split('|').map(s => s.trim()).slice(-3).join(' | ') : '';
+    const currentName = editedNames[o.id] ?? o.name;
+    const needsCategory = !o.categoryText || !isValidCategory(o.categoryText) || forceRecat.has(o.id);
+    const invalidCategory = o.categoryText && !isValidCategory(o.categoryText);
+
+    let rightHTML = '';
+    let actionsHTML = '';
+    const sockSvg = `
+          <svg class="sock-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6h10v20c0 4 2 7 5 10l6 7c2 3 1 8-3 9H24c-4 0-7-3-7-7V13c0-4 1-7 3-7z" stroke="#17a2c4" stroke-width="2.5" fill="#eaf7fb"/>
+            <path d="M31 26h9" stroke="#17a2c4" stroke-width="2"/>
+            <path d="M34 10h10v20c0 4 2 7 5 10l3 4c2 3 1 8-3 9H38c-4 0-7-3-7-7V17c0-4 1-7 3-7z" stroke="#0b3d91" stroke-width="2.5" fill="#eaeefc"/>
+            <circle cx="47" cy="12" r="7" fill="#0072ce"/>
+            <text x="47" y="16" font-size="10" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui">?</text>
+          </svg>`;
+
+    if (o.matched) {
+      rightHTML = `
+        <div class="status-box is-matched">
+          <div class="matched-head"><i class="fas fa-circle-check"></i> Nalezena shoda podle EAN</div>
+          <div class="matched-name">${escapeHTML(o.matchedName)}</div>
+          <div class="matched-cat">${escapeHTML(catShort)}</div>
+        </div>`;
+      actionsHTML = `
+        <button class="btn-primary" data-act="confirm">Potvrdit spárování</button>
+        <button class="btn-link" data-act="notmatch">Není to shoda</button>`;
+    } else if (needsCategory) {
+      rightHTML = `
+        <div class="status-box">
+          ${sockSvg}
+          <div class="empty-text">${invalidCategory ? 'Zaslaná kategorie je příliš obecná / nedostatečná a je potřeba ji upravit.' : 'Bez přiřazené kategorie nabídku nejde spárovat ani zkontrolovat vzor jejího názvu.'}</div>
+          ${categoryPickerHTML(o)}
+        </div>`;
+      actionsHTML = `<button class="btn-link" data-act="postpone">Odložit</button>`;
+    } else {
+      rightHTML = `
+        <div class="status-box">
+          ${sockSvg}
+          <div class="empty-text">Nepodařilo se nám najít odpovídající produkt pro párování na Heurece.</div>
+          <div class="name-editor">
+            <label>Upravte název nabídky podle toho, co pro tuto kategorii chybí:</label>
+            <input type="text" id="nameInput-${o.id}" value="${escapeHTML(currentName)}">
+            <div id="diagBlock-${o.id}">${diagBlockHTML(o, currentName)}</div>
+            <button type="button" class="btn-secondary-link" data-act="recat">Kategorii doplnil někdo špatně? Změnit kategorii</button>
+          </div>
+        </div>`;
+      actionsHTML = `
+        <button class="btn-primary" data-act="submit">Odeslat ke kontrole</button>
+        <button class="btn-link" data-act="postpone">Odložit</button>`;
+    }
+
+    return `
+      <div class="match-row" data-oid="${o.id}">
+        <div class="offer-card">
+          <div class="offer-thumb"><i class="fas ${o.icon}"></i></div>
+          <div class="offer-name">${escapeHTML(o.name)}</div>
+          <div class="offer-meta">Kategorie: ${catShort ? escapeHTML(catShort) : '<span class="cat-missing-inline">nevyplněná</span>'}</div>
+          <div class="offer-meta">EAN: ${o.ean}</div>
+          <div class="offer-price">${o.price.toLocaleString('cs-CZ')} Kč</div>
+        </div>
+        <div class="arrow-col"><i class="fas fa-arrow-right"></i></div>
+        ${rightHTML}
+        <div class="actions-col">${actionsHTML}</div>
+      </div>`;
+  }
+
+  // Připojí event listenery pro jednu vykreslenou kartu (podle data-oid).
+  function wireOfferCard(o, cardEl) {
+    const needsCategory = !o.categoryText || !isValidCategory(o.categoryText) || forceRecat.has(o.id);
+
+    if (o.matched) {
+      cardEl.querySelector('[data-act="confirm"]').addEventListener('click', () => {
+        o.status = 'parovano'; postponed.delete(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        showToast(`✓ „${o.name}“ bylo spárováno.`);
+        render();
+      });
+      cardEl.querySelector('[data-act="notmatch"]').addEventListener('click', () => {
+        o.matched = false; hideToast(); render();
+      });
+    } else if (needsCategory) {
+      const catInput = cardEl.querySelector(`#categoryInput-${o.id}`);
+      catInput.addEventListener('input', () => {
+        categorySearch[o.id] = catInput.value;
+        cardEl.querySelector(`#categoryResults-${o.id}`).innerHTML = categoryResultsHTML(catInput.value);
+      });
+      cardEl.querySelector(`#categoryResults-${o.id}`).addEventListener('click', e => {
+        const opt = e.target.closest('.cat-option');
+        if (!opt) return;
+        o.categoryText = opt.dataset.full;
+        forceRecat.delete(o.id);
+        delete categorySearch[o.id];
+        hideToast(); render();
+      });
+      cardEl.querySelector('[data-act="postpone"]').addEventListener('click', () => {
+        postponed.add(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        hideToast(); render();
+      });
+    } else {
+      const input = cardEl.querySelector(`#nameInput-${o.id}`);
+      input.addEventListener('input', () => {
+        editedNames[o.id] = input.value;
+        cardEl.querySelector(`#diagBlock-${o.id}`).innerHTML = diagBlockHTML(o, input.value);
+      });
+      cardEl.querySelector('[data-act="submit"]').addEventListener('click', () => {
+        o.name = editedNames[o.id] ?? o.name;
+        o.status = 'kontrola'; postponed.delete(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        showToast(`✓ „${o.name}“ odesláno ke kontrole.`);
+        render();
+      });
+      cardEl.querySelector('[data-act="postpone"]').addEventListener('click', () => {
+        postponed.add(o.id);
+        if (pinnedId === o.id) pinnedId = null;
+        hideToast(); render();
+      });
+      cardEl.querySelector('[data-act="recat"]').addEventListener('click', () => {
+        forceRecat.add(o.id); render();
+      });
+    }
+  }
+
   function render() {
     renderProgress();
     const content = document.getElementById('content');
-    if (viewMode !== 'queue') { renderListView(viewMode); return; }
-    const queue = currentQueue();
+    if (viewMode === 'parovano' || viewMode === 'kontrola') { renderListView(viewMode); return; }
+
+    // Výchozí pohled = VŠECHNY nespárované nabídky pod sebou jako plné karty (žádné "otevírání").
+    let queue = currentQueue();
     if (!queue.length) {
       const c = counts();
       content.innerHTML = `
@@ -498,96 +726,49 @@
           <button class="btn-primary" style="width:auto;" id="resetBtn">Začít znovu</button>
         </div>`;
       document.getElementById('resetBtn').addEventListener('click', () => {
-        offers.forEach(o => { o.status = 'pending'; }); postponed.clear();
+        offers.forEach(o => {
+          o.status = 'pending';
+          const snap = initialSnapshot[o.id];
+          if (snap) { o.name = snap.name; o.categoryText = snap.categoryText; }
+        });
+        postponed.clear(); forceRecat.clear();
         Object.keys(editedNames).forEach(k => delete editedNames[k]);
-        pinnedId = null; viewMode = 'queue';
+        Object.keys(categorySearch).forEach(k => delete categorySearch[k]);
+        pinnedId = null; viewMode = 'nesparovano'; problemFilter = 'all';
         hideToast(); render();
       });
       return;
     }
 
-    const o = queue[0];
-    const catPath = o.categoryText.split('|').map(s => s.trim());
-    const catShort = catPath.slice(-3).join(' | ');
-    const currentName = editedNames[o.id] ?? o.name;
-
-    let rightHTML = '';
-    let actionsHTML = '';
-
-    if (o.matched) {
-      rightHTML = `
-        <div class="status-box is-matched">
-          <div class="matched-head"><i class="fas fa-circle-check"></i> Nalezena shoda podle EAN</div>
-          <div class="matched-name">${escapeHTML(o.matchedName)}</div>
-          <div class="matched-cat">${escapeHTML(catShort)}</div>
-        </div>`;
-      actionsHTML = `
-        <button class="btn-primary" id="confirmBtn">Potvrdit spárování</button>
-        <button class="btn-link" id="notMatchBtn">Není to shoda</button>`;
-    } else {
-      rightHTML = `
-        <div class="status-box">
-          <svg class="sock-icon" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M20 6h10v20c0 4 2 7 5 10l6 7c2 3 1 8-3 9H24c-4 0-7-3-7-7V13c0-4 1-7 3-7z" stroke="#17a2c4" stroke-width="2.5" fill="#eaf7fb"/>
-            <path d="M31 26h9" stroke="#17a2c4" stroke-width="2"/>
-            <path d="M34 10h10v20c0 4 2 7 5 10l3 4c2 3 1 8-3 9H38c-4 0-7-3-7-7V17c0-4 1-7 3-7z" stroke="#0b3d91" stroke-width="2.5" fill="#eaeefc"/>
-            <circle cx="47" cy="12" r="7" fill="#0072ce"/>
-            <text x="47" y="16" font-size="10" font-weight="700" fill="#fff" text-anchor="middle" font-family="system-ui">?</text>
-          </svg>
-          <div class="empty-text">Nepodařilo se nám najít odpovídající produkt pro párování na Heurece.</div>
-          <div class="name-editor">
-            <label>Upravte název nabídky podle toho, co pro tuto kategorii chybí:</label>
-            <input type="text" id="nameInput" value="${escapeHTML(currentName)}">
-            <div id="diagBlock">${diagBlockHTML(o, currentName)}</div>
-          </div>
-        </div>`;
-      actionsHTML = `
-        <button class="btn-primary" id="submitBtn">Odeslat ke kontrole</button>
-        <button class="btn-link" id="postponeBtn">Odložit</button>`;
-    }
+    const byType = {};
+    queue.forEach(o => { const t = problemType(o); byType[t] = (byType[t] || 0) + 1; });
+    const filtered = problemFilter === 'all' ? queue : queue.filter(o => problemType(o) === problemFilter);
+    const chip = (key, label, count) => `
+      <button type="button" class="problem-filter-btn${problemFilter === key ? ' active' : ''}" data-filter="${key}">
+        ${escapeHTML(label)} <span class="count">${count}</span>
+      </button>`;
+    const filterBarHTML = `<div class="problem-filter-bar">
+      ${chip('all', 'Vše', queue.length)}
+      ${Object.keys(PROBLEM_LABELS).map(key => byType[key] ? chip(key, PROBLEM_LABELS[key].label, byType[key]) : '').join('')}
+    </div>`;
 
     content.innerHTML = `
-      <div class="match-row">
-        <div class="offer-card">
-          <div class="offer-thumb"><i class="fas ${o.icon}"></i></div>
-          <div class="offer-name">${escapeHTML(o.name)}</div>
-          <div class="offer-meta">Kategorie: ${escapeHTML(catShort)}</div>
-          <div class="offer-meta">EAN: ${o.ean}</div>
-          <div class="offer-price">${o.price.toLocaleString('cs-CZ')} Kč</div>
-        </div>
-        <div class="arrow-col"><i class="fas fa-arrow-right"></i></div>
-        ${rightHTML}
-        <div class="actions-col">${actionsHTML}</div>
-      </div>`;
+      <div class="list-header">
+        <h2>Nespárované nabídky <span style="color:var(--text-secondary); font-weight:400; font-size:14px;">(${filtered.length})</span></h2>
+      </div>
+      ${filterBarHTML}
+      ${filtered.length ? filtered.map(renderOfferCardHTML).join('') : `<div class="empty-list">Žádné nabídky neodpovídají zvolenému filtru.</div>`}`;
 
-    if (o.matched) {
-      document.getElementById('confirmBtn').addEventListener('click', () => {
-        o.status = 'parovano'; postponed.delete(o.id);
-        if (pinnedId === o.id) pinnedId = null;
-        showToast(`✓ „${o.name}“ bylo spárováno.`);
-        render();
-      });
-      document.getElementById('notMatchBtn').addEventListener('click', () => {
-        o.matched = false; hideToast(); render();
-      });
-    } else {
-      const input = document.getElementById('nameInput');
-      input.addEventListener('input', () => {
-        editedNames[o.id] = input.value;
-        document.getElementById('diagBlock').innerHTML = diagBlockHTML(o, input.value);
-      });
-      document.getElementById('submitBtn').addEventListener('click', () => {
-        o.name = editedNames[o.id] ?? o.name;
-        o.status = 'kontrola'; postponed.delete(o.id);
-        if (pinnedId === o.id) pinnedId = null;
-        showToast(`✓ „${o.name}“ odesláno ke kontrole.`);
-        render();
-      });
-      document.getElementById('postponeBtn').addEventListener('click', () => {
-        postponed.add(o.id);
-        if (pinnedId === o.id) pinnedId = null;
-        hideToast(); render();
-      });
+    content.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+      problemFilter = b.dataset.filter; render();
+    }));
+    filtered.forEach(o => {
+      const cardEl = content.querySelector(`.match-row[data-oid="${o.id}"]`);
+      if (cardEl) wireOfferCard(o, cardEl);
+    });
+    if (pinnedId) {
+      const pinnedEl = content.querySelector(`.match-row[data-oid="${pinnedId}"]`);
+      if (pinnedEl) pinnedEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
   }
 
