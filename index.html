@@ -246,10 +246,10 @@
 <script>
 (async function () {
   /* ============ VALIDÁTOR NÁZVU (stejná logika jako Feed validátor / Přehled spárovanosti) ============ */
-  let RULES = {}, PARAMS = {}, CATEGORIES = [];
+  let RULES = {}, PARAMS = {}, PARAMS_V2 = {}, CATEGORIES = [];
   try {
     const proto = await (await fetch('./proto-data.json')).json();
-    RULES = proto.rules || {}; PARAMS = proto.params || {}; CATEGORIES = proto.categories || [];
+    RULES = proto.rules || {}; PARAMS = proto.params || {}; PARAMS_V2 = proto.paramsV2 || {}; CATEGORIES = proto.categories || [];
   } catch (e) { console.error('proto-data.json se nepodařilo načíst', e); }
 
   const fold = s => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
@@ -433,7 +433,7 @@
     off('Osprey Daylite batoh zelený 12l', CAT.batohy, 'Osprey', 1690, false, { icon: 'fa-bag-shopping' }),
   ];
   const initialSnapshot = {};
-  offers.forEach(o => { initialSnapshot[o.id] = { name: o.name, categoryText: o.categoryText }; });
+  offers.forEach(o => { initialSnapshot[o.id] = { name: o.name, categoryText: o.categoryText, params: [...o.params] }; });
 
   /* ============ STAV ============ */
   let viewMode = 'nesparovano'; // 'nesparovano' (výchozí — všechny nespárované pod sebou) | 'parovano' | 'kontrola'
@@ -523,10 +523,10 @@
     return 'name';
   }
   const PROBLEM_LABELS = {
+    'match-pending': { label: 'Ke spárování', cls: 'matched' },
     'category': { label: 'Chybná kategorie', cls: 'unmatched' },
     'name': { label: 'Chybný název', cls: 'unmatched' },
-    'params': { label: 'Párování parametrů', cls: 'unmatched' },
-    'match-pending': { label: 'Ke spárování', cls: 'matched' },
+    'params': { label: 'Chybějící parametr', cls: 'unmatched' },
   };
 
   function renderListView(bucket) {
@@ -838,11 +838,12 @@
         offers.forEach(o => {
           o.status = 'pending';
           const snap = initialSnapshot[o.id];
-          if (snap) { o.name = snap.name; o.categoryText = snap.categoryText; }
+          if (snap) { o.name = snap.name; o.categoryText = snap.categoryText; o.params = [...snap.params]; }
         });
         postponed.clear(); forceRecat.clear();
         Object.keys(editedNames).forEach(k => delete editedNames[k]);
         Object.keys(categorySearch).forEach(k => delete categorySearch[k]);
+        Object.keys(editedParams).forEach(k => delete editedParams[k]);
         pinnedId = null; viewMode = 'nesparovano'; problemFilter = 'all';
         categoryFilter = 'all'; searchQuery = '';
         document.getElementById('offerSearch').value = '';
