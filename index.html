@@ -244,6 +244,199 @@
 </div>
 
 <script>
+// Validátor názvu převzatý z feed-validator/index.html (stejná logika detekce složek vzoru).
+(function () {
+const fold = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+function dejZakladSlova(slovo) {
+  slovo = fold(slovo);
+  if (slovo.length <= 3) return slovo;
+  const konc = ['ova','ove','ovy','ovou','oveho','ovemu','ovych','ovym','ovymi','ami','em','ech','ich','um','ou','am','y','e','a','i','o','u'];
+  for (const k of konc) { if (slovo.endsWith(k)) { const r = slovo.slice(0, -k.length); if (r.length >= 3) return r; break; } }
+  return slovo;
+}
+// STRIKTNÍ dohledání — jen přesný klíč nebo přesný kmen (ne volné substring shody).
+// Máme přesnou kategorii z CATEGORYTEXT, takže si nesmíme vymýšlet cizí pravidla (např. "tatami").
+function najdiPresne(leaf, db) {
+  const k = leaf.toLowerCase().trim();
+  if (Object.prototype.hasOwnProperty.call(db, k)) return db[k];
+  const z = dejZakladSlova(k);
+  for (const kd in db) { if (dejZakladSlova(kd) === z) return db[kd]; }
+  return null;
+}
+const parseParams = t => (t ? t.split(',').map(s => s.trim()).filter(Boolean) : []);
+const splitRule = r => { if (!r) return { format: '', example: '' }; const m = r.match(/\s[–—]\s/); if (!m) return { format: r.trim(), example: '' }; const i = r.indexOf(m[0]); return { format: r.slice(0, i).trim(), example: r.slice(i + m[0].length).trim() }; };
+const leafOf = ct => (ct || '').split('|').pop().trim().toLowerCase();
+
+/* ---- Validátor NÁZVU: rozpozná složky vzoru (Značka | Barva | Objem …) v názvu ---- */
+// Barvy jako KOŘENY → poznají se všechny tvary (černá/černé/černý/černém…).
+const BARVY = ['ciern','biel','zlt','strieb','sivy','siva','cern','bil','cerven','modr','zelen','zlut','oranzov','fialov','ruzov','hned','bezov','zlat','stribr','tyrkys','khaki','antracit','bordo','purpur','azur','kremov','smetanov','vinov','grafit','olivov','lososov','koralov','indigov','marengo','petrolej'];
+const MATERIALY = ['koza','kozen','lan','vlnen','bavln','polyester','kuze','usen','drev','sklo','plast','nerez','kov\\b','kovov','kovan','guma','silikon','vlna','vlnen','len\\b','lnen','hedvab','keramik','porcelan'];
+// Slovníky pro "volné" složky (poskládané ze scrapu Heureky + běžné hodnoty). Orientační.
+const PRICHUTE = ['kure','hovez','kral','jehnec','kachn','krut','losos','tunak','drubez','telec','zverin','sardin','tresk','kreve','jelen','vepr','pstruh','ryba','rybi','jahod','cokolad','vanilk','banan','orisk','orech','karamel','kokos','malin','boruvk','visn','citron','pomeranc','jablk','hrusk','mango','meloun','brosk','kava','skoric','pistac','ananas','limetk','oreo','tiramis','slany'];
+const DRUH_MLETI = ['zrnkov','mlet','mlynek','celozrn','instant'];
+const URCENI = ['adult','junior','senior','kitten','puppy','stenat','stene','dospel','detsk','kastrov','steriliz','large breed','small breed'];
+const KONZISTENCE = ['v zele','ve stav','v omacc','pastik','mousse','pena','krem','prasek','tablet','kapsl','sirup','tekut','granul','zrnit','susen','koncentrat','pate'];
+const slovnikHit = (dic, name) => { const f = fold(name); return dic.some(r => r.includes(' ') ? f.includes(r) : new RegExp('\\b' + r).test(f)); };
+const POCET_UNITS = ['kapsul\\w*','kusov','ks','kus\\w*','pack','balen\\w*','tablet\\w*','kapsl\\w*','tobol\\w*','sac\\w*','porc\\w*','dn[ií]','dni','ampul\\w*'];
+const numUnit = (f, units) => new RegExp('\\b\\d+([.,]\\d+)?\\s?(' + units.join('|') + ')\\b').test(f);
+// anglické barvy (elektronika): whole-word shoda, ať "red" nekoliduje s "redukce"
+const BARVY_EN = ['black','white','blue','red','green','yellow','orange','purple','pink','brown','grey','gray','gold','silver','navy','beige','turquoise','violet','graphite','midnight','starlight'];
+const BARVY_EN_MULTI = ['space gray','space grey','rose gold','jet black','sky blue'];
+const jeBarva = f => BARVY.some(r => new RegExp('\\b' + r).test(f)) || /\bsed(a|e|y|ou|eho|ych|ymi|ym|em)\b/.test(f) || /\bsediv/.test(f) || /\bsiv/.test(f) || /barevn/.test(f) || /\bpruhledn/.test(f) || /\btransparent/.test(f) || /\bcir[aey]/.test(f)
+  || BARVY_EN.some(r => new RegExp('\\b' + r + '\\b').test(f)) || BARVY_EN_MULTI.some(r => f.includes(r));
+// "kód/produktové číslo" = token s písmeny a číslicemi, který vypadá jako kód, ne jako slovo:
+//  - čisté číslo od 5 znaků, nebo
+//  - alespoň 2 číslice (MC500, DSX-A200UI, 3.6K2), nebo
+//  - pomlčka/lomítko spojující písmena a číslici (ZRS-ISO-3), nebo
+//  - jedna číslice jen u VELKÝCH písmen do 7 znaků (BNERV5).
+// Slova s jednou číslicí jako "4carmedia" nebo "3pásmová" a údaje s jednotkou (750ml, 128GB) kódem nejsou.
+function jeKod(name) {
+  return name.split(/\s+/).some(t => {
+    const c = t.replace(/[.,;:()]/g, '');
+    if (/^\d{5,}$/.test(c)) return true;
+    const p = (c.match(/[a-zA-Z]/g) || []).length, d = (c.match(/\d/g) || []).length;
+    if (p < 1 || d < 1 || c.length < 3) return false;
+    if (/^\d+([.,]?\d+)?(ml|cl|dl|l|g|kg|mg|cm|mm|m|w|v|ks|gb|tb|mb|hz|khz|mah|x|k)$/i.test(c)) return false;
+    if (d >= 2) return true;
+    if (/[-\/_]/.test(c)) return true;
+    return p >= 2 && c.length <= 7 && c === c.toUpperCase();
+  }) || /(^|\s)[A-Z]{1,4}\s\d{3,5}(\s|$)/.test(name);
+}
+// velikost: písmenná (S/M/L…; samotné "S" na začátku je předložka), rozsah (S-XL, 36-38),
+// číselná velikost obuvi/oblečení 20–60 (i 42,5) a velikost v cm (50–190), nebo "vel."/"velikost"
+function jeVelikost(name) {
+  const f = fold(name);
+  if (/\bvel(ikost|kost)?\.?\s*\w/.test(f)) return true;
+  const toks = name.split(/\s+/);
+  for (let i = 0; i < toks.length; i++) {
+    const t = toks[i].replace(/[.,;:()]/g, '');
+    if (/^(XXS|XS|M|L|XL|XXL|XXXL|3XL|4XL)$/.test(t)) return true;
+    if (t === 'S' && i > 0) return true;
+  }
+  if (/\b(XXS|XS|S|M|L|XL|XXL|XXXL)\s?[-\/]\s?(XXS|XS|S|M|L|XL|XXL|XXXL)\b/.test(name)) return true;
+  const unit = '(?!\\s?(ml|cl|dl|l|g|kg|mg|cm|mm|m|w|v|ks|kus|kusu|mah|gb|tb|mb|hz|%))';
+  if (new RegExp('(^|\\s)(eu\\s?|size\\s?)?(2\\d|3\\d|4\\d|5\\d|60)([.,]5)?(\\s?[-–/]\\s?(2\\d|3\\d|4\\d|5\\d|60)([.,]5)?)?' + unit + '(?=\\s|$|[,;)])').test(f)) return true;
+  if (/\b(5\d|[6-9]\d|1[0-8]\d)\s?cm\b/.test(f)) return true;
+  return false;
+}
+// Název e-shopu: slovo v názvu nabídky, které se shoduje s názvem e-shopu, je výrobce nebo značka (např. vlastní značka obchodu).
+const ESHOP_STOP = new Set(['obchod','shop','eshop','store','online','www','cz','sk','com','eu','net','org','the','and','pro','spol','ltd','gmbh']);
+function slovaEshopu(shopName) {
+  const f = fold(String(shopName || '')).replace(/^www\./, '').replace(/\.(cz|sk|com|eu|net|org)(?![a-z0-9])/g, ' ');
+  return f.split(/[^a-z0-9]+/).filter(w => w.length >= 3 && !ESHOP_STOP.has(w));
+}
+// vrátí slovo z názvu nabídky shodné (celé slovo) s názvem e-shopu, jinak null
+function shodaSEshopem(name, shopName) {
+  const slova = slovaEshopu(shopName);
+  if (!slova.length) return null;
+  const toks = String(name || '').split(/\s+/).map(t => t.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '')).filter(Boolean);
+  for (const t of toks) { if (slova.includes(fold(t))) return t; }
+  return null;
+}
+function detekujSlozku(slot, name, manufacturer, shopName) {
+  const f = fold(name);
+  switch (slot) {
+    case 'objem':    return numUnit(f, ['ml','cl','dl','l','litr\\w*']);
+    case 'hmotnost': return numUnit(f, ['mg','dkg','kg','g','gr','gram\\w*']);
+    case 'rozmer':   return /\d+([.,]\d+)?\s?[x×]\s?\d/.test(f) || numUnit(f, ['mm','cm','m']); // + Délka/Průměr (metrické)
+    case 'barva':    return jeBarva(f);
+    case 'material': return MATERIALY.some(m => new RegExp('\\b' + m).test(f));
+    case 'velikost': return jeVelikost(name);
+    case 'pamet':    return /\b\d+([.,]\d+)?\s?(gb|tb|mb)\b/.test(f); // RAM / úložiště: 128GB, 1 TB
+    case 'mnozstvi': return detekujSlozku('objem', name, manufacturer) || detekujSlozku('hmotnost', name, manufacturer) || detekujSlozku('pocet', name, manufacturer);
+    case 'pocet':    return new RegExp('\\b\\d+\\s?(' + POCET_UNITS.join('|') + ')\\b').test(f) || /\b\d+\s?[x×](?!\s?\d)/.test(f);
+    case 'kod':      return jeKod(name);
+    case 'nazev':    return name.trim().length > 0;
+    case 'druhmleti':   return slovnikHit(DRUH_MLETI, name);
+    case 'prichut':     return slovnikHit(PRICHUTE, name);
+    case 'urceni':      return slovnikHit(URCENI, name);
+    case 'konzistence': return slovnikHit(KONZISTENCE, name);
+    case 'znacka':   return manufacturer ? f.includes(fold(manufacturer)) : (shodaSEshopem(name, shopName) ? true : null);
+    default:         return null; // volná složka (Řada, Typ, Druh, Určení, Příchuť…) → ověřte ručně
+  }
+}
+function klasifikujSlozku(label) {
+  const f = fold(label);
+  if (f.includes('objem')) return 'objem';
+  if (f.includes('velkost')) return 'velikost';
+  if (f.includes('farba') || f.includes('odtien')) return 'barva';
+  if (f.includes('dlzka') || f.includes('priemer')) return 'rozmer';
+  if (f.includes('pamat')) return 'pamet';
+  if (f.includes('oznacenie')) return 'kod';
+  if (f.includes('mnozstvo')) return 'mnozstvi';
+  if (f.includes('urcenie')) return 'urceni';
+  if (f.includes('konzistenci')) return 'konzistence';
+  if (f.includes('nazov')) return 'nazev';
+  if (f.includes('vyrobca')) return 'znacka';
+  if (f.includes('hmotnost') || f.includes('vaha') || f.includes('gramaz')) return 'hmotnost';
+  if (f.includes('rozmer') || f.includes('delka') || f.includes('prumer')) return 'rozmer';
+  if (f.includes('pamet') || f.includes('uloz')) return 'pamet'; // "Velikost RAM a interní paměti", "Kapacita úložiště"
+  if (f.includes('velikost')) return 'velikost';
+  if (f.includes('barva') || f.includes('barevn') || f.includes('odstin')) return 'barva';
+  if (f.includes('material')) return 'material';
+  if (f.includes('cislo') || f.includes('kod') || f.includes('oznaceni')) return 'kod';
+  if (f.includes('mnozstvi')) return 'mnozstvi';
+  if (f.includes('pocet')) return 'pocet';
+  if (f.includes('mleti')) return 'druhmleti';
+  if (f.includes('prichut')) return 'prichut';
+  if (f.includes('urceni')) return 'urceni';
+  if (f.includes('konzistenc')) return 'konzistence';
+  if (f.includes('nazev')) return 'nazev';
+  if (f.includes('znacka') || f.includes('vyrobce')) return 'znacka';
+  return null;
+}
+// Složka s předponou "Případně / Popřípadě / Příp." je nepovinná ("Případně Produktové číslo").
+const jePripadne = label => /^(případně|popřípadě|příp\.|pripadne|popripade)(\s|$)/i.test(label.trim());
+function vzorTokeny(format) {
+  return format.split('|').map(t => {
+    t = t.trim();
+    const m = t.match(/^(.*?)\s*\((.*)\)\s*$/);
+    const label = (m ? m[1] : t).trim();
+    return { label: label, optional: (!!m && /pokud/i.test(m[2])) || jePripadne(label) };
+  }).filter(t => t.label);
+}
+// Vyhodnotí jednu složku vzoru. Popisek může nabízet alternativy ("Hmotnosť/Objem", "Objem/Průměr",
+// "Rozměr nebo Produktové číslo"): stačí, aby prošla kterákoli, ale jen když se dají ověřit všechny.
+// Text za ", případně" je nepovinná doplňková složka a hlavní složku nijak nezpřísňuje
+// ("Typ, případně Produktové číslo" = Typ povinný, číslo nepovinné).
+function vyhodnotSlozku(label, name, manufacturer, shopName) {
+  const pripadne = label.match(/^(.*?)\s*[,;]?\s+(?:případně|popřípadě|příp\.)\s+/i);
+  if (pripadne && pripadne[1].trim()) label = pripadne[1].trim();
+  const casti = label.split(/\s*\/\s*|\s+(?:nebo|či|alebo)\s+/i).map(s => s.trim()).filter(Boolean);
+  if (casti.length > 1) {
+    const sloty = casti.map(klasifikujSlozku);
+    if (sloty.every(Boolean)) {
+      const vysl = sloty.map(sl => detekujSlozku(sl, name, manufacturer, shopName));
+      if (vysl.some(v => v === true)) return true;
+      if (vysl.every(v => v === false)) return false;
+      return null;
+    }
+  }
+  const slot = klasifikujSlozku(label);
+  return slot ? detekujSlozku(slot, name, manufacturer, shopName) : null;
+}
+// vrátí složky vzoru se stavem: je / chybi / nepovinne / rucne
+function analyzujNazev(ruleFormat, name, manufacturer, shopName) {
+  return vzorTokeny(ruleFormat).map(t => {
+    const res = vyhodnotSlozku(t.label, name, manufacturer, shopName);
+    let stav = 'rucne';
+    if (res === true) stav = 'je';
+    else if (res === false) stav = t.optional ? 'nepovinne' : 'chybi';
+    const out = { label: t.label, stav };
+    // výrobce určený shodou s názvem e-shopu (zdroj: eshop), slovo se připíše k popisku
+    if (res === true && !manufacturer && klasifikujSlozku(t.label) === 'znacka') {
+      const hit = shodaSEshopem(name, shopName);
+      if (hit) { out.label = t.label + ': ' + hit; out.zdroj = 'eshop'; }
+    }
+    return out;
+  });
+}
+
+  window.HKV = { fold: fold, dejZakladSlova: dejZakladSlova, najdiPresne: najdiPresne, parseParams: parseParams, splitRule: splitRule, leafOf: leafOf, analyzujNazev: analyzujNazev, shodaSEshopem: shodaSEshopem };
+})();
+
+</script>
+<script>
 (async function () {
   /* ============ VALIDÁTOR NÁZVU (stejná logika jako Feed validátor / Přehled spárovanosti) ============ */
   let RULES = {}, PARAMS = {}, PARAMS_V2 = {}, CATEGORIES = [];
@@ -264,102 +457,9 @@
   // Pokud ne, jde o příliš obecnou/neexistující kategorii (např. jen "Elektronika" bez dalšího zařazení).
   const VALID_CATEGORY_SET = new Set(CATEGORIES.map(c => c.trim()));
   const isValidCategory = text => VALID_CATEGORY_SET.has((text || '').trim());
-  function dejZakladSlova(slovo) {
-    slovo = fold(slovo);
-    if (slovo.length <= 3) return slovo;
-    const konc = ['ova','ove','ovy','ovou','oveho','ovemu','ovych','ovym','ovymi','ami','em','ech','ich','um','ou','am','y','e','a','i','o','u'];
-    for (const k of konc) { if (slovo.endsWith(k)) { const r = slovo.slice(0, -k.length); if (r.length >= 3) return r; break; } }
-    return slovo;
-  }
-  function najdiPresne(leaf, db) {
-    const k = (leaf || '').toLowerCase().trim();
-    if (Object.prototype.hasOwnProperty.call(db, k)) return db[k];
-    const z = dejZakladSlova(k);
-    for (const kd in db) { if (dejZakladSlova(kd) === z) return db[kd]; }
-    return null;
-  }
-  const parseParams = t => (t ? t.split(',').map(s => s.trim()).filter(Boolean) : []);
-  const splitRule = r => { if (!r) return { format: '', example: '' }; const m = r.match(/\s[–—]\s/); if (!m) return { format: r.trim(), example: '' }; const i = r.indexOf(m[0]); return { format: r.slice(0, i).trim(), example: r.slice(i + m[0].length).trim() }; };
-  const leafOf = ct => (ct || '').split('|').pop().trim().toLowerCase();
+  // Validátor názvu = nové jádro (HKV) z doplňku, stejné jako ve Validátoru názvů a v Přehledu spárovanosti.
+  const { dejZakladSlova, najdiPresne, parseParams, splitRule, leafOf, analyzujNazev } = window.HKV;
 
-  const BARVY = ['cern','bil','cerven','modr','zelen','zlut','oranzov','fialov','ruzov','hned','bezov','zlat','stribr','tyrkys','khaki','antracit','bordo','purpur','azur','kremov','smetanov','vinov','grafit','olivov','lososov','koralov','indigov','marengo','petrolej'];
-  const MATERIALY = ['bavln','polyester','kuze','usen','drev','sklo','plast','nerez','kov','guma','silikon','vlna','vlnen','len','lnen','hedvab','keramik','porcelan'];
-  const PRICHUTE = ['kure','hovez','kral','jehnec','kachn','krut','losos','tunak','drubez','telec','zverin','sardin','tresk','kreve','jelen','vepr','pstruh','ryba','rybi','jahod','cokolad','vanilk','banan','orisk','orech','karamel','kokos','malin','boruvk','visn','citron','pomeranc','jablk','hrusk','mango','meloun','brosk','kava','skoric','pistac','ananas','limetk','oreo','tiramis','slany'];
-  const URCENI = ['adult','junior','senior','kitten','puppy','stenat','stene','dospel','detsk','kastrov','steriliz','large breed','small breed'];
-  const KONZISTENCE = ['v zele','ve stav','v omacc','pastik','mousse','pena','krem','prasek','tablet','kapsl','sirup','tekut','granul','susen','koncentrat','pate'];
-  const slovnikHit = (dic, name) => { const f = fold(name); return dic.some(r => r.includes(' ') ? f.includes(r) : new RegExp('\\b' + r).test(f)); };
-  const POCET_UNITS = ['ks','kus\\w*','pack','balen\\w*','tablet\\w*','kapsl\\w*','tobol\\w*','sac\\w*','porc\\w*','dn[ií]','dni','ampul\\w*'];
-  const numUnit = (f, units) => new RegExp('\\b\\d+([.,]\\d+)?\\s?(' + units.join('|') + ')\\b').test(f);
-  const DRUH_MLETI = ['zrnkov','mlet','mlynek','celozrn','instant'];
-  const BARVY_EN = ['black','white','blue','red','green','yellow','orange','purple','pink','brown','grey','gray','gold','silver','navy','beige','turquoise','violet','graphite','midnight','starlight'];
-  const BARVY_EN_MULTI = ['space gray','space grey','rose gold','jet black','sky blue'];
-  const jeBarva = f => BARVY.some(r => new RegExp('\\b' + r).test(f)) || /\bsed[aeiy]/.test(f) || /\bsiv/.test(f) || /barevn/.test(f) || /\bpruhledn/.test(f) || /\btransparent/.test(f) || /\bcir[aey]/.test(f)
-    || BARVY_EN.some(r => new RegExp('\\b' + r + '\\b').test(f)) || BARVY_EN_MULTI.some(r => f.includes(r));
-  function jeKod(name) {
-    return name.split(/\s+/).some(t => {
-      const c = t.replace(/[.,;:()]/g, '');
-      if (/^\d{5,}$/.test(c)) return true;
-      const p = (c.match(/[a-zA-Z]/g) || []).length, d = (c.match(/\d/g) || []).length;
-      return p >= 2 && d >= 1 && c.length >= 4;
-    });
-  }
-  function detekujSlozku(slot, name, manufacturer) {
-    const f = fold(name);
-    switch (slot) {
-      case 'objem':    return numUnit(f, ['ml','cl','dl','l','litr\\w*']);
-      case 'hmotnost': return numUnit(f, ['mg','dkg','kg','g','gr','gram\\w*']);
-      case 'rozmer':   return /\d+([.,]\d+)?\s?[x×]\s?\d/.test(f) || numUnit(f, ['mm','cm','m']);
-      case 'barva':    return jeBarva(f);
-      case 'material': return MATERIALY.some(m => new RegExp('\\b' + m).test(f));
-      case 'velikost': return /\b(XXS|XS|S|M|L|XL|XXL|XXXL)\b/.test(name) || /\bvel\.?\s*\w/.test(f);
-      case 'pamet':    return /\b\d+([.,]\d+)?\s?(gb|tb|mb)\b/.test(f);
-      case 'pocet':    return new RegExp('\\b\\d+\\s?(' + POCET_UNITS.join('|') + ')\\b').test(f) || /\b\d+\s?[x×]\s?\d/.test(f);
-      case 'kod':      return jeKod(name);
-      case 'nazev':    return name.trim().length > 0;
-      case 'druhmleti':   return slovnikHit(DRUH_MLETI, name);
-      case 'prichut':     return slovnikHit(PRICHUTE, name);
-      case 'urceni':      return slovnikHit(URCENI, name);
-      case 'konzistence': return slovnikHit(KONZISTENCE, name);
-      case 'znacka':   return manufacturer ? f.includes(fold(manufacturer)) : null;
-      default:         return null;
-    }
-  }
-  function klasifikujSlozku(label) {
-    const f = fold(label);
-    if (f.includes('objem')) return 'objem';
-    if (f.includes('hmotnost') || f.includes('vaha') || f.includes('gramaz')) return 'hmotnost';
-    if (f.includes('rozmer') || f.includes('delka') || f.includes('prumer')) return 'rozmer';
-    if (f.includes('pamet') || f.includes('uloz')) return 'pamet';
-    if (f.includes('velikost')) return 'velikost';
-    if (f.includes('barva') || f.includes('barevn') || f.includes('odstin')) return 'barva';
-    if (f.includes('material')) return 'material';
-    if (f.includes('cislo') || f.includes('kod') || f.includes('oznaceni')) return 'kod';
-    if (f.includes('pocet') || f.includes('mnozstvi')) return 'pocet';
-    if (f.includes('mleti')) return 'druhmleti';
-    if (f.includes('prichut')) return 'prichut';
-    if (f.includes('urceni')) return 'urceni';
-    if (f.includes('konzistenc')) return 'konzistence';
-    if (f.includes('nazev')) return 'nazev';
-    if (f.includes('znacka') || f.includes('vyrobce')) return 'znacka';
-    return null;
-  }
-  function vzorTokeny(format) {
-    return format.split('|').map(t => {
-      t = t.trim();
-      const m = t.match(/^(.*?)\s*\((.*)\)\s*$/);
-      return { label: (m ? m[1] : t).trim(), optional: !!m && /pokud/i.test(m[2]) };
-    }).filter(t => t.label);
-  }
-  function analyzujNazev(ruleFormat, name, manufacturer) {
-    return vzorTokeny(ruleFormat).map(t => {
-      const slot = klasifikujSlozku(t.label);
-      const res = slot ? detekujSlozku(slot, name, manufacturer) : null;
-      let stav = 'rucne';
-      if (res === true) stav = 'je';
-      else if (res === false) stav = t.optional ? 'nepovinne' : 'chybi';
-      return { label: t.label, stav };
-    });
-  }
   function diagnostikaNazvu(offer, name) {
     const leaf = leafOf(offer.categoryText);
     const rule = najdiPresne(leaf, RULES);
